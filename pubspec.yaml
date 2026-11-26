@@ -1,7 +1,7 @@
 name: gps_camera
 description: "A GPS Camera app for iOS and Android that embeds GPS coordinates, address, timestamp, and a map snapshot onto captured photos."
 publish_to: "none"
-version: 1.0.1+2
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
