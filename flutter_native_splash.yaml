@@ -1,0 +1,23 @@
+flutter_native_splash:
+  # LIGHT MODE
+  color: "#FFFFFF"
+  image: assets/icon/splash_logo.png
+
+  # DARK MODE (force white background)
+  color_dark: "#FFFFFF"
+  image_dark: assets/icon/splash_logo.png
+
+  android: true
+  ios: true
+
+  android_12:
+    color: "#FFFFFF"
+    image: assets/icon/splash_logo.png
+
+    # ANDROID 12 DARK MODE FIX
+    color_dark: "#FFFFFF"
+    image_dark: assets/icon/splash_logo.png
+
+#generate command
+
+# dart run flutter_native_splash:create --path=flutter_native_splash.yaml
