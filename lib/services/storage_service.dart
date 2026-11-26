@@ -17,18 +17,73 @@ class StorageService {
   }
 
   /// Backward-compatible alias for saveToDownloads
-  static Future<bool> saveToGallery(File file) async {
-    return saveToDownloads(file);
+  static Future<bool> saveToGallery(File file, {bool isVideo = false}) async {
+    return saveToDownloads(file, isVideo: isVideo);
   }
 
-  /// Saves the stamped image file directly to the device's Downloads directory.
+  /// Gets the real width, height, and orientation of the recorded video file.
+  static Future<Map<String, int>> getVideoDimensions(String videoPath) async {
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final Map? res = await _channel.invokeMethod<Map>(
+          'getVideoDimensions',
+          {'videoPath': videoPath},
+        );
+        if (res != null) {
+          return {
+            'width': (res['width'] as num?)?.toInt() ?? 1080,
+            'height': (res['height'] as num?)?.toInt() ?? 1920,
+            'rotation': (res['rotation'] as num?)?.toInt() ?? 0,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting video dimensions: $e');
+    }
+    return {'width': 1080, 'height': 1920, 'rotation': 0};
+  }
+
+  /// Burns the rendered GPS location watermark card PNG onto a video using native Media3 Transformer.
+  static Future<File?> overlayWatermarkOnVideo({
+    required String videoPath,
+    required String overlayPngPath,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final outputPath =
+          '${tempDir.path}/STAMPED_VIDEO_${DateTime.now().millisecondsSinceEpoch}.mp4';
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final String? result = await _channel.invokeMethod<String>(
+          'overlayVideoWatermark',
+          {
+            'videoPath': videoPath,
+            'overlayPngPath': overlayPngPath,
+            'outputPath': outputPath,
+          },
+        );
+
+        if (result != null && await File(result).exists()) {
+          return File(result);
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error overlaying watermark on video: $e');
+      return null;
+    }
+  }
+
+  /// Saves the stamped image or recorded video file directly to the device's Downloads directory.
   /// On Android, uses native Kotlin MediaStore.Downloads API (requires zero dangerous permissions).
   /// On iOS, saves to the app's accessible Documents/Downloads directory.
-  static Future<bool> saveToDownloads(File file) async {
+  static Future<bool> saveToDownloads(File file, {bool isVideo = false}) async {
     try {
       if (!await file.exists()) return false;
 
-      final filename = 'GPS_PHOTO_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final extension = isVideo ? 'mp4' : 'jpg';
+      final prefix = isVideo ? 'GPS_VIDEO_' : 'GPS_PHOTO_';
+      final filename = '$prefix${DateTime.now().millisecondsSinceEpoch}.$extension';
 
       if (defaultTargetPlatform == TargetPlatform.android) {
         // Native Android Kotlin call to MediaStore.Downloads
@@ -37,6 +92,7 @@ class StorageService {
           {
             'filePath': file.path,
             'fileName': filename,
+            'isVideo': isVideo,
           },
         );
         return result != null && result.isNotEmpty;

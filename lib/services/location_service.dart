@@ -245,12 +245,7 @@ class LocationService {
 
   /// Requests user to enable location services or grant location permissions.
   static Future<bool> requestEnableLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      await Geolocator.openLocationSettings();
-      return false;
-    }
-
+    // 1. First check if app-level location permission is granted
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -260,7 +255,16 @@ class LocationService {
       return false;
     }
 
-    return permission == LocationPermission.always ||
+    final hasPermission = permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
+
+    // 2. If permission is granted, check hardware location service (GPS switch)
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      return false;
+    }
+
+    return hasPermission && serviceEnabled;
   }
 }

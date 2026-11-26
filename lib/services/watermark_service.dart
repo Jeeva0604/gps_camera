@@ -61,4 +61,62 @@ class WatermarkService {
     final outputJpg = img.encodeJpg(originalImage, quality: 92);
     return Uint8List.fromList(outputJpg);
   }
+
+  /// Generates the standalone card watermark PNG bytes (e.g. for video overlay).
+  static Future<Uint8List> renderCardWatermarkPng({
+    required Uint8List mapBytes,
+    required GpsPhotoData gpsData,
+    double cardWidth = 720.0,
+    double cardHeight = 280.0,
+    bool? isDarkMode,
+  }) async {
+    final isDark = isDarkMode ?? ThemeService.instance.isDarkMode;
+    return await CardWatermarkRenderer.renderCardPng(
+      mapBytes: mapBytes,
+      gpsData: gpsData,
+      cardWidth: cardWidth,
+      cardHeight: cardHeight,
+      isDarkMode: isDark,
+    );
+  }
+
+  /// Generates a transparent full-frame PNG (e.g. 1080x1920) with the GPS card
+  /// positioned perfectly at the bottom, so it maps 1:1 onto video frames without distortion.
+  static Future<Uint8List> renderFullFrameVideoOverlayPng({
+    required Uint8List mapBytes,
+    required GpsPhotoData gpsData,
+    int frameWidth = 1080,
+    int frameHeight = 1920,
+    bool? isDarkMode,
+  }) async {
+    // Card width occupies ~92% of frame width
+    final cardW = (frameWidth * 0.92).clamp(360, 1400).toDouble();
+    final cardH = (cardW * 0.42).clamp(160, 560).toDouble();
+
+    final cardPngBytes = await renderCardWatermarkPng(
+      mapBytes: mapBytes,
+      gpsData: gpsData,
+      cardWidth: cardW,
+      cardHeight: cardH,
+      isDarkMode: isDarkMode,
+    );
+
+    final fullCanvas = img.Image(width: frameWidth, height: frameHeight, numChannels: 4);
+    final cardImg = img.decodePng(cardPngBytes);
+    if (cardImg != null) {
+      final dstX = (frameWidth - cardImg.width) ~/ 2;
+      // Position safely above navigation bar / bottom bezel (8% of frame height)
+      final bottomMargin = (frameHeight * 0.08).toInt();
+      final dstY = frameHeight - cardImg.height - bottomMargin;
+
+      img.compositeImage(
+        fullCanvas,
+        cardImg,
+        dstX: dstX,
+        dstY: dstY > 0 ? dstY : 0,
+      );
+    }
+
+    return Uint8List.fromList(img.encodePng(fullCanvas));
+  }
 }

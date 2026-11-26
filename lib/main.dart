@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'screens/camera_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/permission_screen.dart';
 import 'services/permission_service.dart';
 import 'services/theme_service.dart';
@@ -68,7 +68,7 @@ class GpsCameraApp extends StatelessWidget {
             useMaterial3: true,
           ),
           home:
-              hasPermissions ? const CameraScreen() : const PermissionScreen(),
+              hasPermissions ? const HomeScreen() : const PermissionScreen(),
         );
       },
     );

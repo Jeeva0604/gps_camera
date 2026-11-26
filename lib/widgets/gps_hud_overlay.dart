@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class GpsHudOverlay extends StatelessWidget {
   final Position? position;
@@ -59,10 +60,12 @@ class GpsHudOverlay extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              !isLocationEnabled
-                  ? Icons.location_off
-                  : (hasGpsFix ? Icons.gps_fixed : Icons.gps_not_fixed),
+            HugeIcon(
+              icon: !isLocationEnabled
+                  ? HugeIcons.strokeRoundedLocationOffline01
+                  : (hasGpsFix
+                      ? HugeIcons.strokeRoundedLocation01
+                      : HugeIcons.strokeRoundedLocation02),
               color: effectiveColor,
               size: 22,
             ),

@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import '../models/gps_photo_data.dart';
 import '../services/open_location_code.dart';
+import 'prominent_map_pin.dart';
 
 class GpsMinimapCard extends StatefulWidget {
   final Position? position;
@@ -126,8 +128,11 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                                 color: const Color(0xFF38BDF8),
                                 borderRadius: BorderRadius.circular(5),
                               ),
-                              child: const Icon(Icons.camera_alt,
-                                  size: 14, color: Color(0xFF0F172A)),
+                              child: const HugeIcon(
+                                icon: HugeIcons.strokeRoundedCamera01,
+                                size: 14,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
                           ),
                         ),
@@ -144,8 +149,11 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                       ],
                     ),
                     IconButton(
-                      icon: Icon(Icons.close,
-                          color: isDark ? Colors.white70 : Colors.black54),
+                      icon: HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancel01,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
@@ -178,13 +186,9 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                         markers: [
                           Marker(
                             point: LatLng(pos.latitude, pos.longitude),
-                            width: 36,
-                            height: 36,
-                            child: const Icon(
-                              Icons.location_pin,
-                              color: Colors.redAccent,
-                              size: 36,
-                            ),
+                            width: 38,
+                            height: 38,
+                            child: const ProminentMapPin(size: 38),
                           ),
                         ],
                       ),
@@ -331,8 +335,11 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                         color: const Color(0xFF38BDF8),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          size: 11, color: Color(0xFF0F172A)),
+                      child: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedCamera01,
+                        size: 11,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ),
@@ -430,18 +437,7 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
 
                                 // Google Style Red Pin at Center
                                 const Center(
-                                  child: Icon(
-                                    Icons.location_on,
-                                    color: Color(0xFFEF4444),
-                                    size: 26,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black54,
-                                        blurRadius: 4,
-                                        offset: Offset(1, 2),
-                                      ),
-                                    ],
-                                  ),
+                                  child: ProminentMapPin(size: 28),
                                 ),
 
                                 // "Google" text logo at bottom-left
@@ -475,9 +471,11 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.location_off,
-                                            color: Colors.amberAccent,
-                                            size: 24),
+                                        const HugeIcon(
+                                          icon: HugeIcons.strokeRoundedLocationOffline01,
+                                          color: Colors.amberAccent,
+                                          size: 24,
+                                        ),
                                         const SizedBox(height: 3),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -501,8 +499,11 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                                 : const Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.satellite_alt,
-                                          color: Colors.amberAccent, size: 24),
+                                      HugeIcon(
+                                        icon: HugeIcons.strokeRoundedSatellite01,
+                                        color: Colors.amberAccent,
+                                        size: 24,
+                                      ),
                                       SizedBox(height: 3),
                                       Text(
                                         'Waiting GPS',

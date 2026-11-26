@@ -387,33 +387,71 @@ class CardWatermarkRenderer {
 
   static void _drawRedMapPin(
       Canvas canvas, double cx, double cy, double scale) {
-    // Exact Material Icons.location_on matching GpsMinimapCard before take image
-    final iconSpan = TextSpan(
-      text: String.fromCharCode(Icons.location_on.codePoint),
-      style: TextStyle(
-        inherit: false,
-        color: const Color(0xFFEF4444),
-        fontSize: 26.0 * scale,
-        fontFamily: Icons.location_on.fontFamily,
-        package: Icons.location_on.fontPackage,
-        shadows: [
-          Shadow(
-            color: Colors.black54,
-            blurRadius: 4.0 * scale,
-            offset: Offset(1.0 * scale, 2.0 * scale),
-          ),
-        ],
+    // In GpsMinimapCard: ProminentMapPin(size: 28) inside a 96x96 box -> 28/96 ratio
+    final w = 28.0 * scale;
+    final h = 28.0 * scale;
+
+    // Ground contact shadow under tip
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.5)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.0 * scale);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, cy + (h * 0.46)),
+        width: w * 0.38,
+        height: h * 0.14,
       ),
+      shadowPaint,
     );
-    final iconPainter = TextPainter(
-      text: iconSpan,
-      textDirection: TextDirection.ltr,
+
+    final r = w * 0.35;
+    final headCenterY = cy - (h * 0.14);
+    final tipY = cy + (h * 0.44);
+
+    final d = tipY - headCenterY;
+    final alpha = asin((r / d).clamp(0.0, 1.0));
+
+    final leftTangent = Offset(
+      cx - (r * cos(alpha)),
+      headCenterY + (r * sin(alpha)),
     );
-    iconPainter.layout();
-    iconPainter.paint(
-      canvas,
-      Offset(cx - (iconPainter.width / 2), cy - (iconPainter.height / 2)),
+    final rightTangent = Offset(
+      cx + (r * cos(alpha)),
+      headCenterY + (r * sin(alpha)),
     );
+
+    final pinPath = Path();
+    pinPath.moveTo(cx, tipY);
+    pinPath.lineTo(leftTangent.dx, leftTangent.dy);
+    pinPath.arcToPoint(
+      rightTangent,
+      radius: Radius.circular(r),
+      largeArc: true,
+      clockwise: true,
+    );
+    pinPath.lineTo(cx, tipY);
+    pinPath.close();
+
+    // High-contrast white border
+    final outlinePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.08
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(pinPath, outlinePaint);
+
+    // Authentic Google Red fill
+    final fillPaint = Paint()
+      ..color = const Color(0xFFEA4335)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(pinPath, fillPaint);
+
+    // Center white hole
+    final holePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(cx, headCenterY), r * 0.44, holePaint);
   }
 
   static void _drawGoogleLogo(Canvas canvas, double x, double y, double scale) {

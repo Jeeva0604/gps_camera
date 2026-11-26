@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import '../services/permission_service.dart';
 import '../services/update_service.dart';
-import 'camera_screen.dart';
+import 'home_screen.dart';
 
 class PermissionScreen extends StatefulWidget {
   const PermissionScreen({super.key});
@@ -37,7 +38,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
     if (result.isGranted) {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const CameraScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     } else {
       setState(() {
@@ -74,8 +75,8 @@ class _PermissionScreenState extends State<PermissionScreen> {
                       width: 2,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.location_on_outlined,
+                  child: const HugeIcon(
+                    icon: HugeIcons.strokeRoundedLocation01,
                     size: 50,
                     color: Colors.blueAccent,
                   ),
@@ -101,14 +102,14 @@ class _PermissionScreenState extends State<PermissionScreen> {
               ),
               const SizedBox(height: 36),
               _buildFeatureRow(
-                icon: Icons.camera_alt_outlined,
+                icon: HugeIcons.strokeRoundedCamera01,
                 title: 'Camera Access',
                 subtitle: 'Capture high-resolution photos directly in-app.',
                 isDark: isDark,
               ),
               const SizedBox(height: 18),
               _buildFeatureRow(
-                icon: Icons.my_location_outlined,
+                icon: HugeIcons.strokeRoundedLocation01,
                 title: 'Location (GPS) Access',
                 subtitle: 'Record exact latitude, longitude, and map snippets.',
                 isDark: isDark,
@@ -175,7 +176,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
   }
 
   Widget _buildFeatureRow({
-    required IconData icon,
+    required dynamic icon,
     required String title,
     required String subtitle,
     required bool isDark,
@@ -190,9 +191,11 @@ class _PermissionScreenState extends State<PermissionScreen> {
                 : const Color(0xFFEEF2F6),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon,
-              color: isDark ? Colors.cyanAccent : const Color(0xFF0284C7),
-              size: 24),
+          child: HugeIcon(
+            icon: icon,
+            color: isDark ? Colors.cyanAccent : const Color(0xFF0284C7),
+            size: 24,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(

@@ -173,34 +173,8 @@ class MapService {
       height: height,
     );
 
-    // Draw GPS location pin at the exact center of the cropped image
-    final cx = width ~/ 2;
-    final cy = height ~/ 2;
-
-    // 1. Radar pulse / accuracy circle
-    img.drawCircle(cropped,
-        x: cx,
-        y: cy,
-        radius: 18,
-        color: img.ColorRgb8(56, 189, 248)); // Cyan ring
-    img.drawCircle(cropped,
-        x: cx,
-        y: cy,
-        radius: 12,
-        color: img.ColorRgb8(255, 255, 255)); // White inner ring
-
-    // 2. Center pin drop shadow
-    img.fillCircle(cropped,
-        x: cx + 1, y: cy + 2, radius: 7, color: img.ColorRgb8(50, 50, 50));
-
-    // 3. Center pin body (Vibrant Red)
-    img.fillCircle(cropped,
-        x: cx, y: cy, radius: 7, color: img.ColorRgb8(239, 68, 68));
-
-    // 4. Center white core
-    img.fillCircle(cropped,
-        x: cx, y: cy, radius: 3, color: img.ColorRgb8(255, 255, 255));
-
+    // Return the clean cropped satellite map tile without hardcoded baked-in circles.
+    // The exact prominent pin and Google logo are overlaid consistently by the renderer.
     return Uint8List.fromList(img.encodePng(cropped));
   }
 
@@ -229,18 +203,6 @@ class MapService {
 
   static Uint8List _decorateSingleTile(img.Image tile, int w, int h) {
     final resized = img.copyResize(tile, width: w, height: h);
-    final cx = w ~/ 2;
-    final cy = h ~/ 2;
-
-    img.drawCircle(resized,
-        x: cx, y: cy, radius: 16, color: img.ColorRgb8(56, 189, 248));
-    img.fillCircle(resized,
-        x: cx + 1, y: cy + 1, radius: 6, color: img.ColorRgb8(50, 50, 50));
-    img.fillCircle(resized,
-        x: cx, y: cy, radius: 6, color: img.ColorRgb8(239, 68, 68));
-    img.fillCircle(resized,
-        x: cx, y: cy, radius: 2, color: img.ColorRgb8(255, 255, 255));
-
     return Uint8List.fromList(img.encodePng(resized));
   }
 

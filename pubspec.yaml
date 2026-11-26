@@ -20,6 +20,8 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   fluttertoast: ^10.0.2
+  video_player: ^2.14.1
+  hugeicons: ^4.4.0
   shared_preferences: ^2.5.6
   in_app_review: ^2.0.12
   in_app_update_flutter: ^3.0.1

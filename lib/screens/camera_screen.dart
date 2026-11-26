@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 // import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/gps_photo_data.dart';
@@ -12,11 +13,22 @@ import '../services/watermark_service.dart';
 import '../widgets/gps_minimap_card.dart';
 import '../services/theme_service.dart';
 import '../services/update_service.dart';
+import 'dart:io';
 import '../utils/toast_helper.dart';
 import 'preview_screen.dart';
+import 'video_preview_screen.dart';
+
+enum CameraMode { photo, video }
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final CameraMode initialMode;
+  final ValueChanged<CameraMode>? onModeChanged;
+
+  const CameraScreen({
+    super.key,
+    this.initialMode = CameraMode.photo,
+    this.onModeChanged,
+  });
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -24,6 +36,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
+  late CameraMode _currentMode;
   List<CameraDescription> _cameras = [];
   CameraController? _cameraController;
   int _selectedCameraIndex = 0;
@@ -32,6 +45,11 @@ class _CameraScreenState extends State<CameraScreen>
   bool _isCameraInitialized = false;
   bool _isCapturing = false;
   String _processingMessage = '';
+
+  // Video recording state
+  bool _isRecordingVideo = false;
+  Timer? _recordTimer;
+  int _recordSeconds = 0;
 
   Position? _currentPosition;
   String? _currentAddress;
@@ -44,6 +62,7 @@ class _CameraScreenState extends State<CameraScreen>
   @override
   void initState() {
     super.initState();
+    _currentMode = widget.initialMode;
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
     _checkLocationStatus();
@@ -58,6 +77,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     final controller = _cameraController;
     _cameraController = null;
@@ -117,7 +137,7 @@ class _CameraScreenState extends State<CameraScreen>
       final controller = CameraController(
         _cameras[_selectedCameraIndex],
         ResolutionPreset.high,
-        enableAudio: false,
+        enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
@@ -294,7 +314,11 @@ class _CameraScreenState extends State<CameraScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
-            Icon(Icons.location_off, color: Colors.amberAccent, size: 28),
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedLocationOffline01,
+              color: Colors.amberAccent,
+              size: 28,
+            ),
             SizedBox(width: 10),
             Text(
               'Location Required',
@@ -321,7 +345,11 @@ class _CameraScreenState extends State<CameraScreen>
               Navigator.of(ctx).pop();
               _promptEnableLocation();
             },
-            icon: const Icon(Icons.settings, size: 18),
+            icon: const HugeIcon(
+              icon: HugeIcons.strokeRoundedSettings01,
+              size: 18,
+              color: Colors.black,
+            ),
             label: const Text('Enable Location'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amberAccent,
@@ -362,9 +390,8 @@ class _CameraScreenState extends State<CameraScreen>
           plusCode: plusCode,
         );
         setState(() {
-          _currentAddress = geo['displayName'] ??
-              geo['locality'] ??
-              updatedData.fullAddress;
+          _currentAddress =
+              geo['displayName'] ?? geo['locality'] ?? updatedData.fullAddress;
           _liveGpsData = updatedData;
         });
         LocationService.saveCachedGpsData(updatedData);
@@ -387,25 +414,44 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> _toggleFlash() async {
     if (_cameraController == null) return;
     FlashMode nextMode;
+    String toastText;
     switch (_flashMode) {
       case FlashMode.off:
         nextMode = FlashMode.auto;
+        toastText = 'Flash: Auto';
         break;
       case FlashMode.auto:
         nextMode = FlashMode.always;
+        toastText = 'Flash: On';
         break;
       case FlashMode.always:
       default:
         nextMode = FlashMode.off;
+        toastText = 'Flash: Off';
         break;
     }
 
     try {
       await _cameraController!.setFlashMode(nextMode);
-      setState(() {
-        _flashMode = nextMode;
-      });
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _flashMode = nextMode;
+        });
+        ToastHelper.show(toastText);
+      }
+    } catch (_) {
+      // If auto or always is not supported by device/lens, toggle to next supported mode
+      try {
+        final fallbackMode = _flashMode == FlashMode.off ? FlashMode.always : FlashMode.off;
+        await _cameraController!.setFlashMode(fallbackMode);
+        if (mounted) {
+          setState(() {
+            _flashMode = fallbackMode;
+          });
+          ToastHelper.show(fallbackMode == FlashMode.off ? 'Flash: Off' : 'Flash: On');
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _captureAndStampPhoto() async {
@@ -491,6 +537,163 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  Future<void> _startVideoRecording() async {
+    final controller = _cameraController;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        _isRecordingVideo) {
+      return;
+    }
+
+    // Verify location is enabled before recording
+    final isLocEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!isLocEnabled) {
+      if (mounted) {
+        setState(() {
+          _isLocationEnabled = false;
+        });
+        _showEnableLocationDialog();
+      }
+      return;
+    }
+
+    try {
+      await controller.startVideoRecording();
+      setState(() {
+        _isRecordingVideo = true;
+        _recordSeconds = 0;
+      });
+
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) {
+          setState(() {
+            _recordSeconds++;
+          });
+        }
+      });
+    } catch (e) {
+      ToastHelper.show('Failed to start recording: $e');
+    }
+  }
+
+  Future<void> _stopVideoRecording() async {
+    final controller = _cameraController;
+    if (controller == null || !_isRecordingVideo) {
+      return;
+    }
+
+    _recordTimer?.cancel();
+    setState(() {
+      _isRecordingVideo = false;
+      _isCapturing = true;
+      _processingMessage = 'Finalizing video recording...';
+    });
+
+    try {
+      final xFile = await controller.stopVideoRecording();
+      File videoFile = File(xFile.path);
+
+      // Lock current GPS position & address for metadata
+      GpsPhotoData? gpsData;
+      try {
+        gpsData = await LocationService.getCaptureGpsData();
+      } catch (_) {
+        gpsData = _liveGpsData;
+      }
+
+      // If we have GPS data, render the GPS location tile and burn it into the video
+      if (gpsData != null) {
+        try {
+          setState(() {
+            _processingMessage = 'Rendering GPS location tile...';
+          });
+
+          // Query the exact resolution and orientation of the recorded video
+          final videoDims =
+              await StorageService.getVideoDimensions(videoFile.path);
+          final vWidth = videoDims['width'] ?? 1080;
+          final vHeight = videoDims['height'] ?? 1920;
+
+          final mapBytes = await MapService.getMapSnapshot(
+            latitude: gpsData.latitude,
+            longitude: gpsData.longitude,
+            width: 320,
+            height: 320,
+            zoom: 18,
+          );
+
+          final cardPngBytes =
+              await WatermarkService.renderFullFrameVideoOverlayPng(
+            mapBytes: mapBytes,
+            gpsData: gpsData,
+            frameWidth: vWidth,
+            frameHeight: vHeight,
+          );
+
+          final cardFile = await StorageService.saveToTempFile(cardPngBytes);
+
+          setState(() {
+            _processingMessage = 'Burning GPS location tile onto video...';
+          });
+
+          final stampedVideo = await StorageService.overlayWatermarkOnVideo(
+            videoPath: videoFile.path,
+            overlayPngPath: cardFile.path,
+          );
+
+          if (stampedVideo != null && await stampedVideo.exists()) {
+            videoFile = stampedVideo;
+          }
+        } catch (overlayError) {
+          debugPrint('Watermark overlay error: $overlayError');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isCapturing = false;
+        _recordSeconds = 0;
+      });
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoPreviewScreen(
+            videoFile: videoFile,
+            gpsData: gpsData,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCapturing = false;
+          _recordSeconds = 0;
+        });
+      }
+      ToastHelper.show('Failed to save video: $e');
+    }
+  }
+
+  String _formatDuration(int totalSeconds) {
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  void _switchMode(CameraMode mode) {
+    if (_isRecordingVideo) {
+      ToastHelper.show('Please stop recording before switching modes.');
+      return;
+    }
+    if (_currentMode != mode) {
+      setState(() {
+        _currentMode = mode;
+      });
+      widget.onModeChanged?.call(mode);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _cameraController;
@@ -530,17 +733,68 @@ class _CameraScreenState extends State<CameraScreen>
                       // Flash Toggle
                       IconButton(
                         onPressed: _toggleFlash,
-                        icon: Icon(
-                          _flashMode == FlashMode.off
-                              ? Icons.flash_off
-                              : _flashMode == FlashMode.auto
-                                  ? Icons.flash_auto
-                                  : Icons.flash_on,
-                          color: _flashMode == FlashMode.off
-                              ? (isDark
-                                  ? Colors.white
-                                  : const Color(0xFF0F172A))
-                              : Colors.amberAccent,
+                        icon: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            HugeIcon(
+                              icon: _flashMode == FlashMode.off
+                                  ? HugeIcons.strokeRoundedFlashOff
+                                  : HugeIcons.strokeRoundedFlash,
+                              color: _flashMode == FlashMode.off
+                                  ? (isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF0F172A))
+                                  : (_flashMode == FlashMode.always
+                                      ? Colors.amberAccent
+                                      : Colors.amber),
+                              size: 20,
+                            ),
+                            if (_flashMode == FlashMode.auto)
+                              Positioned(
+                                right: -7,
+                                bottom: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 2.5, vertical: 0.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amberAccent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'A',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (_flashMode == FlashMode.always)
+                              Positioned(
+                                right: -8,
+                                bottom: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 2.5, vertical: 0.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amberAccent,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'ON',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         style: IconButton.styleFrom(
                           backgroundColor: isDark
@@ -578,8 +832,10 @@ class _CameraScreenState extends State<CameraScreen>
                                     : 'Light mode enabled',
                               );
                             },
-                            icon: Icon(
-                              isDark ? Icons.light_mode : Icons.dark_mode,
+                            icon: HugeIcon(
+                              icon: isDark
+                                  ? HugeIcons.strokeRoundedSun01
+                                  : HugeIcons.strokeRoundedMoon01,
                               color: isDark
                                   ? const Color(0xFFFBBF24)
                                   : const Color(0xFF0284C7),
@@ -595,8 +851,8 @@ class _CameraScreenState extends State<CameraScreen>
                           // Camera Switcher
                           IconButton(
                             onPressed: _toggleCameraLens,
-                            icon: Icon(
-                              Icons.flip_camera_ios,
+                            icon: HugeIcon(
+                              icon: HugeIcons.strokeRoundedCameraRotated01,
                               color: isDark
                                   ? Colors.white
                                   : const Color(0xFF0F172A),
@@ -613,6 +869,47 @@ class _CameraScreenState extends State<CameraScreen>
                     ],
                   ),
                 ),
+                // Recording Timer Badge in Video Mode
+                if (_isRecordingVideo)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.redAccent.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDuration(_recordSeconds),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -675,8 +972,11 @@ class _CameraScreenState extends State<CameraScreen>
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.location_off,
-                                  color: Colors.black, size: 18),
+                              HugeIcon(
+                                icon: HugeIcons.strokeRoundedLocationOffline01,
+                                color: Colors.black,
+                                size: 18,
+                              ),
                               SizedBox(width: 8),
                               Text(
                                 'Location is Off • Tap to Enable',
@@ -693,26 +993,155 @@ class _CameraScreenState extends State<CameraScreen>
                       ),
                     ),
 
-                  // Shutter Button
+                  // Mode Selector Tabs (Photo vs Video)
+                  if (!_isRecordingVideo)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Photo Mode Tab
+                            GestureDetector(
+                              onTap: () => _switchMode(CameraMode.photo),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _currentMode == CameraMode.photo
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    HugeIcon(
+                                      icon: HugeIcons.strokeRoundedCamera01,
+                                      size: 15,
+                                      color: _currentMode == CameraMode.photo
+                                          ? Colors.black
+                                          : Colors.white70,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'PHOTO',
+                                      style: TextStyle(
+                                        color: _currentMode == CameraMode.photo
+                                            ? Colors.black
+                                            : Colors.white70,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Video Mode Tab
+                            GestureDetector(
+                              onTap: () => _switchMode(CameraMode.video),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _currentMode == CameraMode.video
+                                      ? Colors.redAccent
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    HugeIcon(
+                                      icon: HugeIcons.strokeRoundedVideo01,
+                                      size: 16,
+                                      color: _currentMode == CameraMode.video
+                                          ? Colors.white
+                                          : Colors.white70,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'VIDEO',
+                                      style: TextStyle(
+                                        color: _currentMode == CameraMode.video
+                                            ? Colors.white
+                                            : Colors.white70,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Shutter Button (Adaptive for Photo vs Video)
                   GestureDetector(
-                    onTap: _isCapturing ? null : _captureAndStampPhoto,
+                    onTap: _isCapturing
+                        ? null
+                        : (_currentMode == CameraMode.photo
+                            ? _captureAndStampPhoto
+                            : (_isRecordingVideo
+                                ? _stopVideoRecording
+                                : _startVideoRecording)),
                     child: Container(
                       width: 78,
                       height: 78,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                        color: Colors.white.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: _currentMode == CameraMode.video
+                              ? Colors.redAccent
+                              : Colors.white,
+                          width: 4,
+                        ),
+                        color: (_currentMode == CameraMode.video
+                                ? Colors.redAccent
+                                : Colors.white)
+                            .withValues(alpha: 0.2),
                       ),
                       padding: const EdgeInsets.all(5),
                       child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
+                        decoration: BoxDecoration(
+                          color: _currentMode == CameraMode.video
+                              ? Colors.redAccent
+                              : Colors.white,
+                          shape: _isRecordingVideo
+                              ? BoxShape.rectangle
+                              : BoxShape.circle,
+                          borderRadius: _isRecordingVideo
+                              ? BorderRadius.circular(8)
+                              : null,
                         ),
-                        child: const Center(
-                          child: Icon(Icons.camera_alt,
-                              color: Colors.black, size: 28),
+                        child: Center(
+                          child: HugeIcon(
+                            icon: _currentMode == CameraMode.video
+                                ? (_isRecordingVideo
+                                    ? HugeIcons.strokeRoundedStop
+                                    : HugeIcons.strokeRoundedVideo01)
+                                : HugeIcons.strokeRoundedCamera01,
+                            color: _currentMode == CameraMode.video
+                                ? Colors.white
+                                : Colors.black,
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),

@@ -2,12 +2,14 @@ import 'dart:io';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/gps_photo_data.dart';
 import '../services/review_service.dart';
 import '../services/storage_service.dart';
 import '../utils/toast_helper.dart';
+import '../widgets/prominent_map_pin.dart';
 
 class PreviewScreen extends StatefulWidget {
   final File photoFile;
@@ -104,8 +106,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
                               color: const Color(0xFF38BDF8),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.camera_alt,
-                                size: 16, color: Color(0xFF0F172A)),
+                            child: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedCamera01,
+                              size: 16,
+                              color: Color(0xFF0F172A),
+                            ),
                           ),
                         ),
                       ),
@@ -172,13 +177,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                               Marker(
                                 point: LatLng(widget.gpsData.latitude,
                                     widget.gpsData.longitude),
-                                width: 36,
-                                height: 36,
-                                child: const Icon(
-                                  Icons.location_pin,
-                                  color: Colors.redAccent,
-                                  size: 36,
-                                ),
+                                width: 38,
+                                height: 38,
+                                child: const ProminentMapPin(size: 38),
                               ),
                             ],
                           ),
@@ -247,8 +248,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+          icon: HugeIcon(
+            icon: HugeIcons.strokeRoundedArrowLeft01,
             color: isDark ? Colors.white : const Color(0xFF0F172A),
             size: 20,
           ),
@@ -274,8 +275,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     : const Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.info_outline_rounded,
+              child: HugeIcon(
+                icon: HugeIcons.strokeRoundedInformationCircle,
                 color: isDark ? Colors.cyanAccent : const Color(0xFF0284C7),
                 size: 20,
               ),
@@ -352,7 +353,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             children: [
               // Retake Button
               _buildDockIconButton(
-                icon: Icons.refresh_rounded,
+                icon: HugeIcons.strokeRoundedRefresh,
                 label: 'Retake',
                 onTap: () => Navigator.of(context).pop(),
                 isDark: isDark,
@@ -361,7 +362,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
               // Map & Info Button
               _buildDockIconButton(
-                icon: Icons.map_outlined,
+                icon: HugeIcons.strokeRoundedLocation01,
                 label: 'Map Info',
                 onTap: _showMetadataBottomSheet,
                 isDark: isDark,
@@ -372,7 +373,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
               // Share Button
               _buildDockIconButton(
-                icon: Icons.share_rounded,
+                icon: HugeIcons.strokeRoundedShare01,
                 label: 'Share',
                 onTap: _sharePhoto,
                 isDark: isDark,
@@ -391,7 +392,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Widget _buildDockIconButton({
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required VoidCallback onTap,
     required bool isDark,
@@ -424,10 +425,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   width: 1,
                 ),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: iconColor,
+              child: Center(
+                child: HugeIcon(
+                  icon: icon,
+                  size: 20,
+                  color: iconColor,
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -494,10 +497,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     ),
                   )
                 else
-                  Icon(
-                    isSaved
-                        ? Icons.check_circle_rounded
-                        : Icons.save_alt_rounded,
+                  HugeIcon(
+                    icon: isSaved
+                        ? HugeIcons.strokeRoundedCheckmarkCircle02
+                        : HugeIcons.strokeRoundedDownload01,
                     color: Colors.white,
                     size: 20,
                   ),
