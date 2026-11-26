@@ -42,8 +42,13 @@ class _PermissionScreenState extends State<PermissionScreen> {
       );
     } else {
       setState(() {
+        final List<String> missing = [];
+        if (!result.hasCamera) missing.add('Camera');
+        if (!result.hasLocation) missing.add('Location');
+        if (!result.hasMicrophone) missing.add('Microphone');
+
         _errorMessage =
-            'Camera and Location permissions are required to take photos and tag them with GPS data.';
+            'Please grant ${missing.join(', ')} permission${missing.length > 1 ? 's' : ''} to use camera, audio recording, and GPS location stamping.';
       });
     }
   }
@@ -93,25 +98,32 @@ class _PermissionScreenState extends State<PermissionScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                'To capture photos with embedded GPS coordinates, address, and live map snapshots, this app requires camera and location permissions.',
+                'To capture photos and record high-definition videos with embedded GPS coordinates, address, and live map snapshots, this app requires camera, location, and microphone permissions.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 32),
               _buildFeatureRow(
                 icon: HugeIcons.strokeRoundedCamera01,
                 title: 'Camera Access',
-                subtitle: 'Capture high-resolution photos directly in-app.',
+                subtitle: 'Capture high-resolution photos and videos in-app.',
                 isDark: isDark,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               _buildFeatureRow(
                 icon: HugeIcons.strokeRoundedLocation01,
                 title: 'Location (GPS) Access',
                 subtitle: 'Record exact latitude, longitude, and map snippets.',
+                isDark: isDark,
+              ),
+              const SizedBox(height: 16),
+              _buildFeatureRow(
+                icon: HugeIcons.strokeRoundedMic01,
+                title: 'Microphone Access',
+                subtitle: 'Record clear synchronized audio for GPS video capture.',
                 isDark: isDark,
               ),
               if (_errorMessage != null) ...[

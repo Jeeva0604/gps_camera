@@ -25,6 +25,7 @@ dependencies:
   shared_preferences: ^2.5.6
   in_app_review: ^2.0.12
   in_app_update_flutter: ^3.0.1
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

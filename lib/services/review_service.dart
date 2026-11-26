@@ -26,6 +26,22 @@ class ReviewService {
     }
   }
 
+  /// Triggers in-app review dialog on demand (e.g. from Settings > Rate Us)
+  /// Falls back to opening the store listing if the in-app flow is not available
+  static Future<void> requestReviewOrOpenStore() async {
+    try {
+      final isAvailable = await _inAppReview.isAvailable();
+      if (isAvailable) {
+        await _inAppReview.requestReview();
+      } else {
+        await openStoreListing();
+      }
+    } catch (e) {
+      debugPrint('Failed to request in-app review: $e');
+      await openStoreListing();
+    }
+  }
+
   /// Opens the store listing page directly if needed
   static Future<void> openStoreListing() async {
     try {

@@ -730,6 +730,23 @@ class _CameraScreenState extends State<CameraScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Back to Home Button
+                      if (Navigator.of(context).canPop())
+                        IconButton(
+                          tooltip: 'Back to Home',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedArrowLeft01,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: isDark
+                                ? Colors.black.withValues(alpha: 0.5)
+                                : Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+
                       // Flash Toggle
                       IconButton(
                         onPressed: _toggleFlash,
