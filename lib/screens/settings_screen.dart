@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/review_service.dart';
@@ -17,9 +18,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // App info constants
-  static const String _appVersion = '1.0.1';
-  static const String _buildNumber = '2';
+  // App info constants & dynamic version state
+  String _appVersion = '1.0.0';
+  String _buildNumber = '2';
   static const String _supportEmail = 'hellojeralabs@gmail.com';
   static const String _packageName = 'com.jera.gps_camera';
   static const String _playStoreUrl =
@@ -27,6 +28,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const String _privacyPolicyUrl =
       'https://jeralabs.netlify.app/privacy';
   static const String _termsUrl = 'https://jeralabs.netlify.app/terms';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = info.version;
+          _buildNumber = info.buildNumber;
+        });
+      }
+    } catch (_) {}
+  }
 
   Future<void> _contactSupport() async {
     final emailUri = Uri(
@@ -45,7 +64,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
-        ToastHelper.show('Could not open email client. Contact: $_supportEmail');
+        ToastHelper.show(
+            'Could not open email client. Contact: $_supportEmail');
       }
     } catch (_) {
       ToastHelper.show('Support email: $_supportEmail');
@@ -56,7 +76,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const shareText =
         'Check out GPS Camera! Capture photos & videos with live satellite map stamping, GPS coordinates, address, and timestamp:\n$_playStoreUrl';
     try {
-      await Share.share(shareText, subject: 'GPS Camera with Live Map & Watermark');
+      await Share.share(shareText,
+          subject: 'GPS Camera with Live Map & Watermark');
     } catch (e) {
       ToastHelper.show('Failed to share app: $e');
     }
@@ -163,7 +184,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: selected
               ? Colors.blueAccent.withValues(alpha: 0.2)
-              : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFE2E8F0)),
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : const Color(0xFFE2E8F0)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: HugeIcon(
@@ -456,14 +479,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           fontWeight: FontWeight.w600,
                           color: secondaryTextColor,
                           letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Crafted with ❤️ by Jera Labs',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: secondaryTextColor.withValues(alpha: 0.7),
                         ),
                       ),
                     ],

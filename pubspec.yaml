@@ -26,6 +26,8 @@ dependencies:
   in_app_review: ^2.0.12
   in_app_update_flutter: ^3.0.1
   url_launcher: ^6.3.3
+  flutter_inappwebview: ^6.1.5
+  package_info_plus: ^8.1.4
 
 dev_dependencies:
   flutter_test:

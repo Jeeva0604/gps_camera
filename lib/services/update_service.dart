@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_update_flutter/in_app_update_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../utils/toast_helper.dart';
 
@@ -17,8 +18,23 @@ class UpdateService {
   /// Bundle ID for iOS App Store lookup
   static const String iOSBundleId = 'com.jera.gps_camera';
 
-  /// Current app version
-  static const String currentAppVersion = '1.0.1';
+  /// Cached app version
+  static String? _cachedVersion;
+
+  /// Retrieves current app version dynamically via package_info_plus
+  static Future<String> getCurrentAppVersion() async {
+    if (_cachedVersion != null) return _cachedVersion!;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _cachedVersion = info.version;
+      return info.version;
+    } catch (_) {
+      return '1.0.0';
+    }
+  }
+
+  /// Synchronous fallback or cached version string
+  static String get currentAppVersion => _cachedVersion ?? '1.0.0';
 
   /// Checks for available in-app updates on Android (Play Core) and iOS (StoreKit).
   /// [showFeedbackOnLatest]: when true (e.g. from Settings), informs the user if they're on the latest version.
@@ -27,24 +43,30 @@ class UpdateService {
     if (_isChecking) return;
     _isChecking = true;
 
+    final version = await getCurrentAppVersion();
+
     try {
       if (Platform.isAndroid) {
-        await _checkAndroidUpdate(showFeedbackOnLatest: showFeedbackOnLatest);
+        await _checkAndroidUpdate(
+            appVersion: version, showFeedbackOnLatest: showFeedbackOnLatest);
       } else if (Platform.isIOS) {
-        await _checkIosUpdate(showFeedbackOnLatest: showFeedbackOnLatest);
+        await _checkIosUpdate(
+            appVersion: version, showFeedbackOnLatest: showFeedbackOnLatest);
       }
     } catch (e) {
       debugPrint('UpdateService check error: $e');
       if (showFeedbackOnLatest) {
-        ToastHelper.show('App is up to date (v$currentAppVersion)');
+        ToastHelper.show('App is up to date (v$version)');
       }
     } finally {
       _isChecking = false;
     }
   }
 
-  static Future<void> _checkAndroidUpdate(
-      {bool showFeedbackOnLatest = false}) async {
+  static Future<void> _checkAndroidUpdate({
+    required String appVersion,
+    bool showFeedbackOnLatest = false,
+  }) async {
     try {
       final updateInfo = await _updater.checkUpdateAndroid();
 
@@ -72,20 +94,22 @@ class UpdateService {
         }
       } else {
         if (showFeedbackOnLatest) {
-          ToastHelper.show('App is up to date (v$currentAppVersion)');
+          ToastHelper.show('App is up to date (v$appVersion)');
         }
       }
     } catch (e) {
       // Sideloaded APKs or debug builds throw when Play Core is not connected to Play Store
       debugPrint('Android In-App Update: $e');
       if (showFeedbackOnLatest) {
-        ToastHelper.show('App is up to date (v$currentAppVersion)');
+        ToastHelper.show('App is up to date (v$appVersion)');
       }
     }
   }
 
-  static Future<void> _checkIosUpdate(
-      {bool showFeedbackOnLatest = false}) async {
+  static Future<void> _checkIosUpdate({
+    required String appVersion,
+    bool showFeedbackOnLatest = false,
+  }) async {
     try {
       String targetAppStoreId = appStoreId;
       bool hasUpdate = false;
@@ -105,7 +129,7 @@ class UpdateService {
             final trackId = result['trackId']?.toString() ?? '';
 
             if (trackId.isNotEmpty &&
-                _isNewerVersion(storeVersion, currentAppVersion)) {
+                _isNewerVersion(storeVersion, appVersion)) {
               targetAppStoreId = trackId;
               hasUpdate = true;
             }
@@ -116,12 +140,12 @@ class UpdateService {
       if (targetAppStoreId.isNotEmpty && hasUpdate) {
         await _updater.showUpdateForIos(appStoreId: targetAppStoreId);
       } else if (showFeedbackOnLatest) {
-        ToastHelper.show('App is up to date (v$currentAppVersion)');
+        ToastHelper.show('App is up to date (v$appVersion)');
       }
     } catch (e) {
       debugPrint('iOS In-App Update: $e');
       if (showFeedbackOnLatest) {
-        ToastHelper.show('App is up to date (v$currentAppVersion)');
+        ToastHelper.show('App is up to date (v$appVersion)');
       }
     }
   }

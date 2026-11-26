@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../services/theme_service.dart';
 
 class InAppWebViewScreen extends StatefulWidget {
@@ -20,101 +19,16 @@ class InAppWebViewScreen extends StatefulWidget {
 }
 
 class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
-  bool _isLoading = true;
-  String? _htmlContent;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchWebPage();
-  }
-
-  Future<void> _fetchWebPage() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final response = await http
-          .get(Uri.parse(widget.url))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _htmlContent = _cleanHtmlContent(response.body);
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage =
-                'Failed to load content (HTTP ${response.statusCode})';
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage =
-              'Unable to connect. Please check your internet connection.';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  String _cleanHtmlContent(String rawHtml) {
-    // Basic text extractor removing HTML tags & scripts while preserving paragraphs
-    String text = rawHtml;
-
-    // Remove script and style tags and contents
-    text = text.replaceAll(RegExp(r'<script[\s\S]*?</script>'), '');
-    text = text.replaceAll(RegExp(r'<style[\s\S]*?</style>'), '');
-    text = text.replaceAll(RegExp(r'<head[\s\S]*?</head>'), '');
-
-    // Replace break and paragraph tags with newlines
-    text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
-    text = text.replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n');
-    text = text.replaceAll(
-        RegExp(r'</h1>|</h2>|</h3>|</h4>', caseSensitive: false), '\n\n');
-    text = text.replaceAll(RegExp(r'</li>', caseSensitive: false), '\n');
-
-    // Remove remaining HTML tags
-    text = text.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Decode standard HTML entities
-    text = text
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&mdash;', '—')
-        .replaceAll('&ndash;', '–');
-
-    // Collapse multiple blank lines
-    text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    return text.trim();
-  }
+  InAppWebViewController? _webViewController;
+  double _progress = 0;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   Future<void> _openExternalBrowser() async {
     final uri = Uri.parse(widget.url);
     try {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.inAppBrowserView,
-      );
-    } catch (_) {
-      try {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } catch (_) {}
-    }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   @override
@@ -150,6 +64,20 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Refresh',
+            icon: HugeIcon(
+              icon: HugeIcons.strokeRoundedRefresh,
+              color: primaryTextColor,
+              size: 20,
+            ),
+            onPressed: () {
+              setState(() {
+                _hasError = false;
+              });
+              _webViewController?.reload();
+            },
+          ),
+          IconButton(
             tooltip: 'Open in Browser',
             icon: HugeIcon(
               icon: HugeIcons.strokeRoundedShare01,
@@ -162,117 +90,156 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
         ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(color: Colors.blueAccent),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Loading ${widget.title}...',
-                      style: TextStyle(color: secondaryTextColor, fontSize: 14),
-                    ),
-                  ],
+        child: Stack(
+          children: [
+            InAppWebView(
+              initialUrlRequest: URLRequest(
+                url: WebUri(widget.url),
+              ),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                domStorageEnabled: true,
+                transparentBackground: true,
+                supportZoom: true,
+                useWideViewPort: true,
+                loadWithOverviewMode: true,
+                cacheEnabled: true,
+              ),
+              onWebViewCreated: (controller) {
+                _webViewController = controller;
+              },
+              onProgressChanged: (controller, progress) {
+                if (mounted) {
+                  setState(() {
+                    _progress = progress / 100;
+                  });
+                }
+              },
+              onReceivedError: (controller, request, error) {
+                if (mounted) {
+                  setState(() {
+                    _hasError = true;
+                    _errorMessage = error.description;
+                  });
+                }
+              },
+              onReceivedHttpError: (controller, request, errorResponse) {
+                if (mounted) {
+                  setState(() {
+                    _hasError = true;
+                    _errorMessage =
+                        'HTTP error: ${errorResponse.statusCode}';
+                  });
+                }
+              },
+            ),
+
+            // Linear Progress Indicator on Top
+            if (_progress < 1.0 && !_hasError)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  backgroundColor: Colors.transparent,
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                  minHeight: 2.5,
                 ),
-              )
-            : _errorMessage != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+              ),
+
+            // Error Overlay if page fails to load
+            if (_hasError)
+              Container(
+                color: backgroundColor,
+                padding: const EdgeInsets.all(24.0),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const HugeIcon(
+                          icon: HugeIcons.strokeRoundedCancel01,
+                          color: Colors.redAccent,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Unable to load page',
+                        style: TextStyle(
+                          color: primaryTextColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage.isNotEmpty
+                            ? _errorMessage
+                            : 'Please check your internet connection.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: secondaryTextColor,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent.withValues(alpha: 0.15),
-                              shape: BoxShape.circle,
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _hasError = false;
+                              });
+                              _webViewController?.reload();
+                            },
+                            icon: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedRefresh,
+                              size: 18,
+                              color: Colors.white,
                             ),
-                            child: const HugeIcon(
-                              icon: HugeIcons.strokeRoundedCancel01,
-                              color: Colors.redAccent,
-                              size: 32,
+                            label: const Text('Try Again'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: primaryTextColor,
-                              fontSize: 15,
+                          const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            onPressed: _openExternalBrowser,
+                            icon: const HugeIcon(
+                              icon: HugeIcons.strokeRoundedShare01,
+                              size: 18,
+                              color: Colors.blueAccent,
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: _fetchWebPage,
-                                icon: const HugeIcon(
-                                  icon: HugeIcons.strokeRoundedRefresh,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                                label: const Text('Retry'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blueAccent,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
+                            label: const Text('Open in Browser'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.blueAccent,
+                              side: const BorderSide(color: Colors.blueAccent),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 12),
-                              OutlinedButton.icon(
-                                onPressed: _openExternalBrowser,
-                                icon: const HugeIcon(
-                                  icon: HugeIcons.strokeRoundedShare01,
-                                  size: 18,
-                                  color: Colors.blueAccent,
-                                ),
-                                label: const Text('Open Browser'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.blueAccent,
-                                  side: const BorderSide(
-                                      color: Colors.blueAccent),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.all(20.0),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Text(
-                        _htmlContent ?? '',
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontSize: 14.5,
-                          height: 1.6,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
