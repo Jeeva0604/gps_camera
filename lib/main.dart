@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/permission_screen.dart';
 import 'services/permission_service.dart';
+import 'services/template_service.dart';
 import 'services/theme_service.dart';
 
 void main() async {
@@ -15,6 +16,7 @@ void main() async {
   ]);
 
   await ThemeService.instance.init();
+  await TemplateService.instance.initialize();
 
   final permissionResult = await PermissionService.checkPermissions();
 

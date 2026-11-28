@@ -4,13 +4,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/gps_photo_data.dart';
+import 'template_service.dart';
 
 class CardWatermarkRenderer {
   /// Renders the floating GPS Map Camera satellite card with:
   /// - Above Card: Clean pill badge with real app logo and "GPS Map Camera" title
   /// - Main Card:
-  ///   - Left: Square satellite map thumbnail with red pin, radar beam, and "Google" logo
-  ///   - Right: Location title, flag emoji, detailed Plus Code address,
+  ///   - Left: Satellite map thumbnail rendered with selected CardTemplate
+  ///     (Classic, Circular, Polaroid, Organic Leaf, Golden Halo, Hexagon)
+  ///   - Right: Location title, GPS fix distance badge, flag emoji, detailed Plus Code address,
   ///     Lat/Long, and GMT timestamp.
   /// Exactly matches the typography (GoogleSans), font sizes, weights, and layout of GpsMinimapCard.
   static Future<Uint8List> renderCardPng({
@@ -19,7 +21,9 @@ class CardWatermarkRenderer {
     required double cardWidth,
     double? cardHeight,
     bool isDarkMode = true,
+    CardTemplate? template,
   }) async {
+    final activeTemplate = template ?? TemplateService.instance.currentTemplate;
     // Reference base width of GpsMinimapCard on phone screen is 360.0
     final scale = (cardWidth / 360.0).clamp(1.0, 4.5);
     final cardPadding = 10.0 * scale;
@@ -61,9 +65,13 @@ class CardWatermarkRenderer {
     final badgeHeight = max(iconBoxSize, badgePainter.height) + (badgePadV * 2);
     final cardTop = badgeHeight + badgeGap;
 
+    final borderMargin = 6.0 * scale; // Buffer margin so borders & shadows are never cut off
+    final actualCardWidth = cardWidth - (borderMargin * 2);
+    final cardLeft = borderMargin;
+
     // Right Content Column width and positioning
-    final textStartX = cardPadding + mapSize + (10.0 * scale);
-    final textAvailableWidth = cardWidth - textStartX - cardPadding;
+    final textStartX = cardLeft + cardPadding + mapSize + (10.0 * scale);
+    final textAvailableWidth = actualCardWidth - (cardPadding * 2) - mapSize - (10.0 * scale);
 
     // Theme-based colors
     final titleTextColor = isDarkMode ? Colors.white : const Color(0xFF0F172A);
@@ -74,6 +82,9 @@ class CardWatermarkRenderer {
         isDarkMode ? const Color(0xFFE0E0E0) : const Color(0xFF64748B);
 
     // Line 1: Locality, State, Country (matching GpsMinimapCard: 14.5, bold, GoogleSans, height 1.2)
+    final distanceBadgeWidth = 62.0 * scale;
+    final titleMaxW = textAvailableWidth - distanceBadgeWidth;
+
     double titleFontSize = 14.5 * scale;
     TextPainter titlePainter;
     while (true) {
@@ -92,7 +103,7 @@ class CardWatermarkRenderer {
         textDirection: TextDirection.ltr,
         maxLines: 2,
       );
-      titlePainter.layout(maxWidth: textAvailableWidth);
+      titlePainter.layout(maxWidth: titleMaxW);
       if (!titlePainter.didExceedMaxLines || titleFontSize <= 10.5 * scale) {
         break;
       }
@@ -202,7 +213,7 @@ class CardWatermarkRenderer {
 
     final contentHeight = max(mapSize, textColumnHeight);
     final actualCardHeight = contentHeight + (cardPadding * 2);
-    final totalCanvasHeight = actualCardHeight + badgeHeight + badgeGap;
+    final totalCanvasHeight = actualCardHeight + badgeHeight + badgeGap + (borderMargin * 2);
 
     final recorder = ui.PictureRecorder();
     final canvas =
@@ -217,6 +228,7 @@ class CardWatermarkRenderer {
     _drawTopBadge(
       canvas,
       cardWidth,
+      borderMargin,
       scale,
       appLogoImage,
       badgePainter,
@@ -224,70 +236,83 @@ class CardWatermarkRenderer {
       isDarkMode,
     );
 
-    // 2. Draw Main Location Card Background (rounded rectangle)
-    final cardRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, cardTop, cardWidth, actualCardHeight),
-      rrectRadius,
-    );
+    // 2. Draw Main Location Card Background & Border (with ambient drop shadow)
+    final cardRect = Rect.fromLTWH(cardLeft, cardTop, actualCardWidth, actualCardHeight);
+    final cardRRect = RRect.fromRectAndRadius(cardRect, rrectRadius);
+
+    // Drop shadow under card for crisp distinction from photo
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: isDarkMode ? 0.6 : 0.25)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8.0 * scale);
+    canvas.drawRRect(cardRRect.shift(Offset(0, 3.0 * scale)), shadowPaint);
+
     final cardBgPaint = Paint()
       ..color = isDarkMode
-          ? const Color(0xE8242424) // Deep charcoal translucent
-          : const Color(0xF5FFFFFF) // Crisp frosted white
+          ? const Color(0xF21E232B) // High opacity deep charcoal
+          : const Color(0xFAFFFFFF) // Crisp frosted white
       ..style = PaintingStyle.fill;
     canvas.drawRRect(cardRRect, cardBgPaint);
 
-    // Subtle card border
+    // Template specific card border (high contrast & clearly visible on all 4 sides)
+    final Color borderStrokeColor;
+    switch (activeTemplate) {
+      case CardTemplate.classic:
+        borderStrokeColor = isDarkMode
+            ? const Color(0x70FFFFFF) // Distinct white border
+            : const Color(0x40000000); // Distinct dark border
+        break;
+      case CardTemplate.circular:
+        borderStrokeColor = const Color(0xFF3B82F6);
+        break;
+      case CardTemplate.polaroid:
+        borderStrokeColor = const Color(0xFFFB7185);
+        break;
+      case CardTemplate.organic:
+        borderStrokeColor = const Color(0xFF10B981);
+        break;
+      case CardTemplate.golden:
+        borderStrokeColor = const Color(0xFFFBBF24);
+        break;
+      case CardTemplate.hexagon:
+        borderStrokeColor = const Color(0xFFA855F7);
+        break;
+    }
+
     final borderPaint = Paint()
-      ..color = isDarkMode
-          ? Colors.white.withValues(alpha: 0.15)
-          : Colors.black.withValues(alpha: 0.12)
+      ..color = borderStrokeColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 * scale;
+      ..strokeWidth = 1.6 * scale;
     canvas.drawRRect(cardRRect, borderPaint);
 
-    // 3. Draw Left Square Satellite Map Box
-    final mapLeft = cardPadding;
+    // 3. Draw Satellite Map Box using the active CardTemplate
+    final mapLeft = cardLeft + cardPadding;
     final mapTop = cardTop + cardPadding;
-    final mapRect = Rect.fromLTWH(mapLeft, mapTop, mapSize, mapSize);
-    final mapRRect =
-        RRect.fromRectAndRadius(mapRect, Radius.circular(10.0 * scale));
-
-    canvas.save();
-    canvas.clipRRect(mapRRect);
-
-    // Draw satellite map
-    canvas.drawImageRect(
+    _drawTemplateMap(
+      canvas,
+      activeTemplate,
       mapImage,
-      Rect.fromLTWH(
-          0, 0, mapImage.width.toDouble(), mapImage.height.toDouble()),
-      mapRect,
-      Paint()..filterQuality = FilterQuality.high,
+      mapLeft,
+      mapTop,
+      mapSize,
+      scale,
+      isDarkMode,
     );
-
-    // Draw Google Map Red Pin at center
-    final mapCx = mapLeft + (mapSize / 2);
-    final mapCy = mapTop + (mapSize / 2);
-    _drawRedMapPin(canvas, mapCx, mapCy, scale);
-
-    // Draw "Google" logo at bottom-left of map (matching GpsMinimapCard: 10.0, GoogleSans)
-    _drawGoogleLogo(canvas, mapLeft + (5.0 * scale),
-        mapTop + mapSize - (16.0 * scale), scale);
-
-    canvas.restore();
-
-    // Map box outline
-    final mapBorderPaint = Paint()
-      ..color = isDarkMode
-          ? Colors.white.withValues(alpha: 0.25)
-          : Colors.black.withValues(alpha: 0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0 * scale;
-    canvas.drawRRect(mapRRect, mapBorderPaint);
 
     // 4. Draw Right Content Column with exact GpsMinimapCard layout
     double currentY = cardTop + cardPadding;
 
     titlePainter.paint(canvas, Offset(textStartX, currentY));
+
+    // Draw GPS Tag Badge beside title
+    _drawGpsTagBadge(
+      canvas,
+      activeTemplate,
+      cardLeft + actualCardWidth - cardPadding - (56.0 * scale),
+      currentY + (1.0 * scale),
+      scale,
+      isDarkMode,
+    );
+
     currentY += titlePainter.height + (1.0 * scale);
 
     flagPainter.paint(canvas, Offset(textStartX, currentY));
@@ -313,6 +338,7 @@ class CardWatermarkRenderer {
   static void _drawTopBadge(
     Canvas canvas,
     double cardW,
+    double borderMargin,
     double scale,
     ui.Image? appLogoImage,
     TextPainter badgePainter,
@@ -323,8 +349,8 @@ class CardWatermarkRenderer {
     final padH = 10.0 * scale;
     final gap = 6.0 * scale;
     final badgeWidth = padH + iconBoxSize + gap + badgePainter.width + padH;
-    final badgeX = cardW - badgeWidth - (14.0 * scale);
-    const badgeY = 0.0;
+    final badgeX = cardW - borderMargin - badgeWidth - (10.0 * scale);
+    final badgeY = borderMargin;
 
     final badgeRRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(badgeX, badgeY, badgeWidth, badgeHeight),
@@ -476,5 +502,207 @@ class CardWatermarkRenderer {
         TextPainter(text: textSpan, textDirection: TextDirection.ltr);
     painter.layout();
     painter.paint(canvas, Offset(x, y));
+  }
+
+  /// Draws the satellite map using the specified template design
+  static void _drawTemplateMap(
+    Canvas canvas,
+    CardTemplate template,
+    ui.Image mapImage,
+    double mapLeft,
+    double mapTop,
+    double mapSize,
+    double scale,
+    bool isDarkMode,
+  ) {
+    final mapRect = Rect.fromLTWH(mapLeft, mapTop, mapSize, mapSize);
+    final cx = mapLeft + (mapSize / 2);
+    final cy = mapTop + (mapSize / 2);
+
+    canvas.save();
+
+    switch (template) {
+      case CardTemplate.classic:
+        final mapRRect =
+            RRect.fromRectAndRadius(mapRect, Radius.circular(10.0 * scale));
+        canvas.clipRRect(mapRRect);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        _drawGoogleLogo(canvas, mapLeft + (5.0 * scale),
+            mapTop + mapSize - (16.0 * scale), scale);
+        canvas.restore();
+
+        final mapBorderPaint = Paint()
+          ..color = isDarkMode
+              ? Colors.white.withValues(alpha: 0.25)
+              : Colors.black.withValues(alpha: 0.12)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0 * scale;
+        canvas.drawRRect(mapRRect, mapBorderPaint);
+        break;
+
+      case CardTemplate.circular:
+        final circlePath = Path()
+          ..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
+        canvas.clipPath(circlePath);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        _drawGoogleLogo(canvas, mapLeft + (12.0 * scale),
+            mapTop + mapSize - (18.0 * scale), scale);
+        canvas.restore();
+
+        final ringPaint = Paint()
+          ..color = const Color(0xFF2563EB)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5 * scale;
+        canvas.drawCircle(Offset(cx, cy), mapSize / 2, ringPaint);
+        break;
+
+      case CardTemplate.polaroid:
+        canvas.translate(cx, cy);
+        canvas.rotate(-0.05);
+        canvas.translate(-cx, -cy);
+
+        final frameRect =
+            Rect.fromLTWH(mapLeft - (2 * scale), mapTop - (2 * scale),
+                mapSize + (4 * scale), mapSize + (4 * scale));
+        final frameRRect =
+            RRect.fromRectAndRadius(frameRect, Radius.circular(6.0 * scale));
+        canvas.drawRRect(frameRRect, Paint()..color = Colors.white);
+
+        final innerRRect =
+            RRect.fromRectAndRadius(mapRect, Radius.circular(4.0 * scale));
+        canvas.clipRRect(innerRRect);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        canvas.restore();
+        break;
+
+      case CardTemplate.organic:
+        final rrect =
+            RRect.fromRectAndRadius(mapRect, Radius.circular(20.0 * scale));
+        canvas.clipRRect(rrect);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        _drawGoogleLogo(canvas, mapLeft + (6.0 * scale),
+            mapTop + mapSize - (16.0 * scale), scale);
+        canvas.restore();
+
+        final borderPaint = Paint()
+          ..color = const Color(0xFF10B981)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 * scale;
+        canvas.drawRRect(rrect, borderPaint);
+
+        // Draw little green leaf badge on bottom-left
+        final leafCx = mapLeft + (4.0 * scale);
+        final leafCy = mapTop + mapSize - (4.0 * scale);
+        canvas.drawCircle(
+            Offset(leafCx, leafCy), 8.0 * scale, Paint()..color = const Color(0xFF10B981));
+        canvas.drawCircle(
+            Offset(leafCx, leafCy), 5.0 * scale, Paint()..color = Colors.white);
+        break;
+
+      case CardTemplate.golden:
+        final circlePath = Path()
+          ..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
+        canvas.clipPath(circlePath);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        _drawGoogleLogo(canvas, mapLeft + (12.0 * scale),
+            mapTop + mapSize - (18.0 * scale), scale);
+        canvas.restore();
+
+        final ringPaint = Paint()
+          ..color = const Color(0xFFF59E0B)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0 * scale;
+        canvas.drawCircle(Offset(cx, cy), mapSize / 2, ringPaint);
+        break;
+
+      case CardTemplate.hexagon:
+        final hexPath = _createHexagonPath(mapRect);
+        canvas.clipPath(hexPath);
+        _drawMapImage(canvas, mapImage, mapRect);
+        _drawRedMapPin(canvas, cx, cy, scale);
+        canvas.restore();
+
+        final hexBorder = Paint()
+          ..color = const Color(0xFF8B5CF6)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5 * scale;
+        canvas.drawPath(hexPath, hexBorder);
+        break;
+    }
+  }
+
+  static void _drawMapImage(Canvas canvas, ui.Image mapImage, Rect mapRect) {
+    canvas.drawImageRect(
+      mapImage,
+      Rect.fromLTWH(
+          0, 0, mapImage.width.toDouble(), mapImage.height.toDouble()),
+      mapRect,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+  }
+
+  static Path _createHexagonPath(Rect rect) {
+    final path = Path();
+    final w = rect.width;
+    final h = rect.height;
+    final l = rect.left;
+    final t = rect.top;
+
+    path.moveTo(l + (w * 0.5), t);
+    path.lineTo(l + w, t + (h * 0.25));
+    path.lineTo(l + w, t + (h * 0.75));
+    path.lineTo(l + (w * 0.5), t + h);
+    path.lineTo(l, t + (h * 0.75));
+    path.lineTo(l, t + (h * 0.25));
+    path.close();
+    return path;
+  }
+
+  static void _drawGpsTagBadge(
+    Canvas canvas,
+    CardTemplate template,
+    double x,
+    double y,
+    double scale,
+    bool isDarkMode,
+  ) {
+    final badgeW = 54.0 * scale;
+    final badgeH = 16.0 * scale;
+    final rrect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, y, badgeW, badgeH), Radius.circular(8.0 * scale));
+
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = template.accentColor.withValues(alpha: isDarkMode ? 0.25 : 0.15),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = template.accentColor.withValues(alpha: 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8 * scale,
+    );
+
+    final textSpan = TextSpan(
+      text: 'GPS FIX',
+      style: TextStyle(
+        fontFamily: 'GoogleSans',
+        color: template.accentColor,
+        fontSize: 8.5 * scale,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.4,
+      ),
+    );
+    final painter =
+        TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+    painter.layout();
+    painter.paint(canvas,
+        Offset(x + ((badgeW - painter.width) / 2), y + ((badgeH - painter.height) / 2)));
   }
 }

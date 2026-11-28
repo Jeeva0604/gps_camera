@@ -5,11 +5,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/review_service.dart';
+import '../services/template_service.dart';
 import '../services/theme_service.dart';
 import '../services/update_service.dart';
 import '../utils/app_design.dart';
 import '../utils/toast_helper.dart';
 import 'in_app_web_view_screen.dart';
+import 'template_select_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -344,12 +346,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // Appearance Section
-                _buildSectionHeader('APPEARANCE', secondaryTextColor),
+                _buildSectionHeader('APPEARANCE & TEMPLATES', secondaryTextColor),
                 const SizedBox(height: 8),
                 _buildCardGroup(
                   cardColor: cardColor,
                   borderColor: borderColor,
                   children: [
+                    _buildSettingsTile(
+                      title: 'Watermark Template',
+                      subtitle: TemplateService.instance.currentTemplate.displayName,
+                      icon: HugeIcons.strokeRoundedLocation01,
+                      iconColor: TemplateService.instance.currentTemplate.accentColor,
+                      primaryTextColor: primaryTextColor,
+                      secondaryTextColor: secondaryTextColor,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const TemplateSelectScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildDivider(borderColor),
                     _buildSettingsTile(
                       title: 'Theme',
                       subtitle: _getThemeSubtitle(),
