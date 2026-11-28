@@ -6,6 +6,7 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import '../models/gps_photo_data.dart';
+import '../screens/template_select_screen.dart';
 import '../services/open_location_code.dart';
 import '../services/template_service.dart';
 import 'prominent_map_pin.dart';
@@ -289,9 +290,6 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
             ? 'Lat ${pos.latitude.toStringAsFixed(6)}° Long ${pos.longitude.toStringAsFixed(6)}°'
             : 'Lat --.------° Long --.------°');
 
-    // Line 5: Timestamp
-    final timeText = _formatDateTimeWithGmt(_currentTime);
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListenableBuilder(
@@ -307,9 +305,12 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
             Padding(
               padding: const EdgeInsets.only(right: 18, bottom: 4),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xE81E242C) : const Color(0xF2FFFFFF),
+                  color: isDark
+                      ? const Color(0xE81E242C)
+                      : const Color(0xF2FFFFFF),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: isDark
@@ -318,7 +319,8 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -368,33 +370,46 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
               decoration: _getCardDecoration(template, isDark),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
                   children: [
-                    // 1. Left Satellite Map (Styled according to selected template)
-                    _buildTemplateMapView(template, pos, hasFix, isDark),
+                    // Decorative Background Wave Patterns (matching reference image)
+                    if (template != CardTemplate.classic)
+                      Positioned(
+                        right: -20,
+                        bottom: -30,
+                        child: CustomPaint(
+                          size: const Size(180, 110),
+                          painter: _CardWavePainter(
+                            waveColors: template.waveColors,
+                          ),
+                        ),
+                      ),
 
-                    const SizedBox(width: 10),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. Left Satellite Map (Styled according to selected template)
+                          _buildTemplateMapView(template, pos, hasFix, isDark),
 
-                    // 2. Right Text Column
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: !widget.isLocationEnabled
-                            ? widget.onEnableLocation
-                            : null,
-                        behavior: HitTestBehavior.opaque,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Line 1: Locality, State, Country + Distance Tag
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
+                          const SizedBox(width: 10),
+
+                          // 2. Center Text Column
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: !widget.isLocationEnabled
+                                  ? widget.onEnableLocation
+                                  : null,
+                              behavior: HitTestBehavior.opaque,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Line 1: Locality, State, Country
+                                  Text(
                                     titleText,
                                     style: TextStyle(
                                       color: !widget.isLocationEnabled
@@ -411,97 +426,162 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
+
+                                  const SizedBox(height: 3),
+
+                                  // Line 2: Country Flag Emoji & Country Name
+                                  Row(
+                                    children: [
+                                      Text(flag,
+                                          style:
+                                              const TextStyle(fontSize: 14.0)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        data?.country ?? 'India',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white70
+                                              : const Color(0xFF475569),
+                                          fontSize: 11.0,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 2),
+
+                                  // Line 3: Detailed Address with Plus Code
+                                  Text(
+                                    detailAddr,
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.grey.shade300
+                                          : const Color(0xFF334155),
+                                      fontSize: 10.5,
+                                      height: 1.25,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+
+                                  const SizedBox(height: 3),
+
+                                  // Line 4: Formatted Lat/Long
+                                  Row(
+                                    children: [
+                                      HugeIcon(
+                                        icon:
+                                            HugeIcons.strokeRoundedNavigation01,
+                                        color: isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF64748B),
+                                        size: 11,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          latLongText,
+                                          style: TextStyle(
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF0F172A),
+                                            fontSize: 11.0,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (template == CardTemplate.classic) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatDateTimeWithGmt(_currentTime),
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.grey.shade300
+                                            : const Color(0xFF64748B),
+                                        fontSize: 10.0,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // 3. Right Side Corner: Template Change Button
+                          Tooltip(
+                            message: 'Change Watermark Template',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const TemplateSelectScreen(),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                      horizontal: 8, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: template.accentColor
-                                        .withValues(alpha: isDark ? 0.22 : 0.12),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: template.accentColor.withValues(
+                                        alpha: isDark ? 0.22 : 0.14),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: template.accentColor
-                                          .withValues(alpha: 0.35),
-                                      width: 0.8,
+                                          .withValues(alpha: 0.5),
+                                      width: 1.2,
                                     ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: template.accentColor
+                                            .withValues(alpha: 0.25),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: Row(
+                                  child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       HugeIcon(
-                                        icon: HugeIcons.strokeRoundedLocation01,
-                                        size: 10,
-                                        color: template.accentColor,
+                                        icon: HugeIcons.strokeRoundedPaintBoard,
+                                        size: 15,
+                                        color: isDark
+                                            ? Colors.white
+                                            : template.accentColor,
                                       ),
-                                      const SizedBox(width: 3),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        'GPS FIX',
+                                        'TEMPLATE',
                                         style: TextStyle(
-                                          color: template.accentColor,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
+                                          color: isDark
+                                              ? Colors.white
+                                              : template.accentColor,
+                                          fontSize: 7.5,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.4,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 1),
-
-                            // Line 2: Country Flag Emoji
-                            Text(
-                              flag,
-                              style: const TextStyle(fontSize: 18.0),
-                            ),
-
-                            const SizedBox(height: 2),
-
-                            // Line 3: Detailed Address with Plus Code
-                            Text(
-                              detailAddr,
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.grey.shade200
-                                    : const Color(0xFF334155),
-                                fontSize: 11.0,
-                                height: 1.25,
                               ),
-                              maxLines: 3,
                             ),
-
-                            const SizedBox(height: 3),
-
-                            // Line 4: Formatted Lat/Long
-                            Text(
-                              latLongText,
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF0F172A),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                            ),
-
-                            const SizedBox(height: 2),
-
-                            // Line 5: Formatted Timestamp with Day and GMT
-                            Text(
-                              timeText,
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.grey.shade300
-                                    : const Color(0xFF64748B),
-                                fontSize: 10.5,
-                              ),
-                              maxLines: 1,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -515,41 +595,37 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
   }
 
   BoxDecoration _getCardDecoration(CardTemplate template, bool isDark) {
-    Color borderC;
-    switch (template) {
-      case CardTemplate.classic:
-        borderC = isDark
-            ? Colors.white.withValues(alpha: 0.15)
-            : Colors.black.withValues(alpha: 0.12);
-        break;
-      case CardTemplate.circular:
-        borderC = const Color(0xFF2563EB).withValues(alpha: 0.4);
-        break;
-      case CardTemplate.polaroid:
-        borderC = const Color(0xFFF43F5E).withValues(alpha: 0.35);
-        break;
-      case CardTemplate.organic:
-        borderC = const Color(0xFF10B981).withValues(alpha: 0.35);
-        break;
-      case CardTemplate.golden:
-        borderC = const Color(0xFFF59E0B).withValues(alpha: 0.45);
-        break;
-      case CardTemplate.hexagon:
-        borderC = const Color(0xFF8B5CF6).withValues(alpha: 0.4);
-        break;
+    if (template == CardTemplate.classic) {
+      return BoxDecoration(
+        color: isDark ? const Color(0xE8242424) : const Color(0xF5FFFFFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.black.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
     }
 
     return BoxDecoration(
-      color: isDark ? const Color(0xE8242424) : const Color(0xF5FFFFFF),
+      color: template.cardBackgroundColor,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
-        color: borderC,
-        width: 1.2,
+        color: template.cardBorderColor,
+        width: 1.5,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.12),
-          blurRadius: 12,
+          color: Colors.black.withValues(alpha: 0.6),
+          blurRadius: 16,
           offset: const Offset(0, 4),
         ),
       ],
@@ -703,28 +779,59 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
         );
 
       case CardTemplate.polaroid:
-        return Transform.rotate(
-          angle: -0.05,
-          child: Container(
-            width: 96,
-            height: 96,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Pink spark lines above top-left of polaroid
+            Positioned(
+              top: -6,
+              left: -4,
+              child: Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFB7185),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    width: 3,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFB7185),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Transform.rotate(
+              angle: -0.05,
+              child: Container(
+                width: 96,
+                height: 96,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: mapWidget,
+                ),
+              ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: mapWidget,
-            ),
-          ),
+          ],
         );
 
       case CardTemplate.organic:
@@ -787,21 +894,89 @@ class _GpsMinimapCardState extends State<GpsMinimapCard>
         );
 
       case CardTemplate.hexagon:
-        return ClipPath(
-          clipper: _HexagonShapeClipper(),
-          child: Container(
-            width: 96,
-            height: 96,
-            color: const Color(0xFF8B5CF6),
-            padding: const EdgeInsets.all(2.5),
-            child: ClipPath(
-              clipper: _HexagonShapeClipper(),
-              child: mapWidget,
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Violet spark lines above top-right of hexagon
+            Positioned(
+              top: -6,
+              right: 6,
+              child: Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA855F7),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    width: 3,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA855F7),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+            ClipPath(
+              clipper: _HexagonShapeClipper(),
+              child: Container(
+                width: 96,
+                height: 96,
+                color: const Color(0xFF8B5CF6),
+                padding: const EdgeInsets.all(2.5),
+                child: ClipPath(
+                  clipper: _HexagonShapeClipper(),
+                  child: mapWidget,
+                ),
+              ),
+            ),
+          ],
         );
     }
   }
+}
+
+class _CardWavePainter extends CustomPainter {
+  final List<Color> waveColors;
+
+  _CardWavePainter({required this.waveColors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (waveColors.isEmpty) return;
+
+    final w = size.width;
+    final h = size.height;
+
+    // Wave 1
+    final path1 = Path();
+    path1.moveTo(0, h * 0.7);
+    path1.quadraticBezierTo(w * 0.4, h * 0.2, w, h * 0.5);
+    path1.lineTo(w, h);
+    path1.lineTo(0, h);
+    path1.close();
+    canvas.drawPath(path1, Paint()..color = waveColors[0]);
+
+    // Wave 2
+    if (waveColors.length > 1) {
+      final path2 = Path();
+      path2.moveTo(w * 0.2, h);
+      path2.quadraticBezierTo(w * 0.6, h * 0.45, w, h * 0.75);
+      path2.lineTo(w, h);
+      path2.close();
+      canvas.drawPath(path2, Paint()..color = waveColors[1]);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CardWavePainter oldDelegate) =>
+      oldDelegate.waveColors != waveColors;
 }
 
 class _HexagonShapeClipper extends CustomClipper<Path> {

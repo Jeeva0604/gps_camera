@@ -65,13 +65,15 @@ class CardWatermarkRenderer {
     final badgeHeight = max(iconBoxSize, badgePainter.height) + (badgePadV * 2);
     final cardTop = badgeHeight + badgeGap;
 
-    final borderMargin = 6.0 * scale; // Buffer margin so borders & shadows are never cut off
+    final borderMargin =
+        6.0 * scale; // Buffer margin so borders & shadows are never cut off
     final actualCardWidth = cardWidth - (borderMargin * 2);
     final cardLeft = borderMargin;
 
     // Right Content Column width and positioning
     final textStartX = cardLeft + cardPadding + mapSize + (10.0 * scale);
-    final textAvailableWidth = actualCardWidth - (cardPadding * 2) - mapSize - (10.0 * scale);
+    final textAvailableWidth =
+        actualCardWidth - (cardPadding * 2) - mapSize - (10.0 * scale);
 
     // Theme-based colors
     final titleTextColor = isDarkMode ? Colors.white : const Color(0xFF0F172A);
@@ -82,9 +84,6 @@ class CardWatermarkRenderer {
         isDarkMode ? const Color(0xFFE0E0E0) : const Color(0xFF64748B);
 
     // Line 1: Locality, State, Country (matching GpsMinimapCard: 14.5, bold, GoogleSans, height 1.2)
-    final distanceBadgeWidth = 62.0 * scale;
-    final titleMaxW = textAvailableWidth - distanceBadgeWidth;
-
     double titleFontSize = 14.5 * scale;
     TextPainter titlePainter;
     while (true) {
@@ -103,7 +102,7 @@ class CardWatermarkRenderer {
         textDirection: TextDirection.ltr,
         maxLines: 2,
       );
-      titlePainter.layout(maxWidth: titleMaxW);
+      titlePainter.layout(maxWidth: textAvailableWidth);
       if (!titlePainter.didExceedMaxLines || titleFontSize <= 10.5 * scale) {
         break;
       }
@@ -213,7 +212,8 @@ class CardWatermarkRenderer {
 
     final contentHeight = max(mapSize, textColumnHeight);
     final actualCardHeight = contentHeight + (cardPadding * 2);
-    final totalCanvasHeight = actualCardHeight + badgeHeight + badgeGap + (borderMargin * 2);
+    final totalCanvasHeight =
+        actualCardHeight + badgeHeight + badgeGap + (borderMargin * 2);
 
     final recorder = ui.PictureRecorder();
     final canvas =
@@ -237,7 +237,8 @@ class CardWatermarkRenderer {
     );
 
     // 2. Draw Main Location Card Background & Border (with ambient drop shadow)
-    final cardRect = Rect.fromLTWH(cardLeft, cardTop, actualCardWidth, actualCardHeight);
+    final cardRect =
+        Rect.fromLTWH(cardLeft, cardTop, actualCardWidth, actualCardHeight);
     final cardRRect = RRect.fromRectAndRadius(cardRect, rrectRadius);
 
     // Drop shadow under card for crisp distinction from photo
@@ -248,35 +249,25 @@ class CardWatermarkRenderer {
 
     final cardBgPaint = Paint()
       ..color = isDarkMode
-          ? const Color(0xF21E232B) // High opacity deep charcoal
+          ? (activeTemplate == CardTemplate.classic
+              ? const Color(0xF21E232B)
+              : activeTemplate.cardBackgroundColor)
           : const Color(0xFAFFFFFF) // Crisp frosted white
       ..style = PaintingStyle.fill;
     canvas.drawRRect(cardRRect, cardBgPaint);
 
-    // Template specific card border (high contrast & clearly visible on all 4 sides)
-    final Color borderStrokeColor;
-    switch (activeTemplate) {
-      case CardTemplate.classic:
-        borderStrokeColor = isDarkMode
-            ? const Color(0x70FFFFFF) // Distinct white border
-            : const Color(0x40000000); // Distinct dark border
-        break;
-      case CardTemplate.circular:
-        borderStrokeColor = const Color(0xFF3B82F6);
-        break;
-      case CardTemplate.polaroid:
-        borderStrokeColor = const Color(0xFFFB7185);
-        break;
-      case CardTemplate.organic:
-        borderStrokeColor = const Color(0xFF10B981);
-        break;
-      case CardTemplate.golden:
-        borderStrokeColor = const Color(0xFFFBBF24);
-        break;
-      case CardTemplate.hexagon:
-        borderStrokeColor = const Color(0xFFA855F7);
-        break;
+    // Draw bottom-right decorative wave patterns if not classic
+    if (activeTemplate != CardTemplate.classic) {
+      canvas.save();
+      canvas.clipRRect(cardRRect);
+      _drawCardWaves(canvas, cardRect, activeTemplate.waveColors, scale);
+      canvas.restore();
     }
+
+    // Template specific card border (high contrast & clearly visible on all 4 sides)
+    final Color borderStrokeColor = activeTemplate == CardTemplate.classic
+        ? (isDarkMode ? const Color(0x70FFFFFF) : const Color(0x40000000))
+        : activeTemplate.cardBorderColor;
 
     final borderPaint = Paint()
       ..color = borderStrokeColor
@@ -302,16 +293,6 @@ class CardWatermarkRenderer {
     double currentY = cardTop + cardPadding;
 
     titlePainter.paint(canvas, Offset(textStartX, currentY));
-
-    // Draw GPS Tag Badge beside title
-    _drawGpsTagBadge(
-      canvas,
-      activeTemplate,
-      cardLeft + actualCardWidth - cardPadding - (56.0 * scale),
-      currentY + (1.0 * scale),
-      scale,
-      isDarkMode,
-    );
 
     currentY += titlePainter.height + (1.0 * scale);
 
@@ -543,7 +524,8 @@ class CardWatermarkRenderer {
 
       case CardTemplate.circular:
         final circlePath = Path()
-          ..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
+          ..addOval(
+              Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
         canvas.clipPath(circlePath);
         _drawMapImage(canvas, mapImage, mapRect);
         _drawRedMapPin(canvas, cx, cy, scale);
@@ -563,9 +545,8 @@ class CardWatermarkRenderer {
         canvas.rotate(-0.05);
         canvas.translate(-cx, -cy);
 
-        final frameRect =
-            Rect.fromLTWH(mapLeft - (2 * scale), mapTop - (2 * scale),
-                mapSize + (4 * scale), mapSize + (4 * scale));
+        final frameRect = Rect.fromLTWH(mapLeft - (2 * scale),
+            mapTop - (2 * scale), mapSize + (4 * scale), mapSize + (4 * scale));
         final frameRRect =
             RRect.fromRectAndRadius(frameRect, Radius.circular(6.0 * scale));
         canvas.drawRRect(frameRRect, Paint()..color = Colors.white);
@@ -597,15 +578,23 @@ class CardWatermarkRenderer {
         // Draw little green leaf badge on bottom-left
         final leafCx = mapLeft + (4.0 * scale);
         final leafCy = mapTop + mapSize - (4.0 * scale);
+        final badgeRadius = 11.0 * scale;
+
+        // Emerald circle background
         canvas.drawCircle(
-            Offset(leafCx, leafCy), 8.0 * scale, Paint()..color = const Color(0xFF10B981));
-        canvas.drawCircle(
-            Offset(leafCx, leafCy), 5.0 * scale, Paint()..color = Colors.white);
+          Offset(leafCx, leafCy),
+          badgeRadius,
+          Paint()..color = const Color(0xFF10B981),
+        );
+
+        // White leaf icon inside badge
+        _drawLeafIcon(canvas, leafCx, leafCy, 14.0 * scale);
         break;
 
       case CardTemplate.golden:
         final circlePath = Path()
-          ..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
+          ..addOval(
+              Rect.fromCircle(center: Offset(cx, cy), radius: mapSize / 2));
         canvas.clipPath(circlePath);
         _drawMapImage(canvas, mapImage, mapRect);
         _drawRedMapPin(canvas, cx, cy, scale);
@@ -663,46 +652,57 @@ class CardWatermarkRenderer {
     return path;
   }
 
-  static void _drawGpsTagBadge(
-    Canvas canvas,
-    CardTemplate template,
-    double x,
-    double y,
-    double scale,
-    bool isDarkMode,
-  ) {
-    final badgeW = 54.0 * scale;
-    final badgeH = 16.0 * scale;
-    final rrect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, y, badgeW, badgeH), Radius.circular(8.0 * scale));
-
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..color = template.accentColor.withValues(alpha: isDarkMode ? 0.25 : 0.15),
-    );
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..color = template.accentColor.withValues(alpha: 0.4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8 * scale,
-    );
-
-    final textSpan = TextSpan(
-      text: 'GPS FIX',
-      style: TextStyle(
-        fontFamily: 'GoogleSans',
-        color: template.accentColor,
-        fontSize: 8.5 * scale,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.4,
+  static void _drawLeafIcon(Canvas canvas, double cx, double cy, double size) {
+    // Exact Material Icons.eco shape
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.eco.codePoint),
+        style: TextStyle(
+          fontSize: size,
+          fontFamily: Icons.eco.fontFamily,
+          package: Icons.eco.fontPackage,
+          color: Colors.white,
+        ),
       ),
+      textDirection: TextDirection.ltr,
     );
-    final painter =
-        TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-    painter.layout();
-    painter.paint(canvas,
-        Offset(x + ((badgeW - painter.width) / 2), y + ((badgeH - painter.height) / 2)));
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(cx - (textPainter.width / 2), cy - (textPainter.height / 2)),
+    );
+  }
+
+  static void _drawCardWaves(
+    Canvas canvas,
+    Rect cardRect,
+    List<Color> waveColors,
+    double scale,
+  ) {
+    if (waveColors.isEmpty) return;
+
+    final w = cardRect.width;
+    final h = cardRect.height;
+    final r = cardRect.right;
+    final b = cardRect.bottom;
+
+    // Outer subtle ambient wave
+    final path1 = Path();
+    path1.moveTo(r - (w * 0.45), b);
+    path1.quadraticBezierTo(r - (w * 0.25), b - (h * 0.70), r, b - (h * 0.45));
+    path1.lineTo(r, b);
+    path1.close();
+    canvas.drawPath(path1, Paint()..color = waveColors[0]);
+
+    // Inner bright gradient wave
+    if (waveColors.length > 1) {
+      final path2 = Path();
+      path2.moveTo(r - (w * 0.35), b);
+      path2.quadraticBezierTo(
+          r - (w * 0.15), b - (h * 0.45), r, b - (h * 0.25));
+      path2.lineTo(r, b);
+      path2.close();
+      canvas.drawPath(path2, Paint()..color = waveColors[1]);
+    }
   }
 }

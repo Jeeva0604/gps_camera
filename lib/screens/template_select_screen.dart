@@ -10,7 +10,8 @@ class TemplateSelectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([ThemeService.instance, TemplateService.instance]),
+      listenable:
+          Listenable.merge([ThemeService.instance, TemplateService.instance]),
       builder: (context, _) {
         final isDark = ThemeService.instance.isDarkMode;
         final selectedTemplate = TemplateService.instance.currentTemplate;
@@ -87,7 +88,8 @@ class TemplateSelectScreen extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
-                                color: template.accentColor.withValues(alpha: 0.15),
+                                color: template.accentColor
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: HugeIcon(
@@ -186,82 +188,125 @@ class TemplateSelectScreen extends StatelessWidget {
   }
 
   Widget _buildTemplateVisualPreview(CardTemplate template, bool isDark) {
-    final bgColor = isDark ? const Color(0xE81A202C) : const Color(0xF5FFFFFF);
-    final borderColor = template.accentColor.withValues(alpha: 0.3);
+    final bgColor = template == CardTemplate.classic
+        ? (isDark ? const Color(0xE81A202C) : const Color(0xF5FFFFFF))
+        : template.cardBackgroundColor;
+    final borderColor = template == CardTemplate.classic
+        ? (isDark ? Colors.white24 : Colors.black12)
+        : template.cardBorderColor;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Map Shape representation
-          _buildMapShape(template),
-
-          const SizedBox(width: 12),
-
-          // Text content representation
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Andipatti, Tamil Nadu',
-                      style: TextStyle(
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: template.accentColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '10.2 km',
-                        style: TextStyle(
-                          color: template.accentColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                const Text('🇮🇳 India', style: TextStyle(fontSize: 11)),
-                const SizedBox(height: 2),
-                Text(
-                  '2j36+r3, Andipatti, Theni',
-                  style: TextStyle(
-                    color: isDark ? Colors.white70 : const Color(0xFF475569),
-                    fontSize: 10.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Lat 10.004553° Long 77.610243°',
-                  style: TextStyle(
-                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            // Wave background for non-classic templates
+            if (template != CardTemplate.classic)
+              Positioned(
+                right: -20,
+                bottom: -25,
+                child: CustomPaint(
+                  size: const Size(140, 90),
+                  painter: _PreviewWavePainter(waveColors: template.waveColors),
+                ),
+              ),
+
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Map Shape representation
+                  _buildMapShape(template),
+
+                  const SizedBox(width: 10),
+
+                  // Text content representation
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          template.wonderTitle,
+                          style: TextStyle(
+                            color:
+                                isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(template.wonderFlag,
+                                style: const TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                            Text(template.wonderCountry,
+                                style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          template.wonderAddress,
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.white70
+                                : const Color(0xFF475569),
+                            fontSize: 10,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const HugeIcon(
+                              icon: HugeIcons.strokeRoundedNavigation01,
+                              color: Colors.white70,
+                              size: 10,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                template.wonderCoordinates,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -281,8 +326,10 @@ class TemplateSelectScreen extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                const Icon(Icons.location_on, color: Colors.redAccent, size: 22),
+                Image.asset(placeholderImg,
+                    fit: BoxFit.cover, width: size, height: size),
+                const Icon(Icons.location_on,
+                    color: Colors.redAccent, size: 22),
               ],
             ),
           ),
@@ -300,8 +347,10 @@ class TemplateSelectScreen extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                const Icon(Icons.location_on, color: Colors.redAccent, size: 22),
+                Image.asset(placeholderImg,
+                    fit: BoxFit.cover, width: size, height: size),
+                const Icon(Icons.location_on,
+                    color: Colors.redAccent, size: 22),
               ],
             ),
           ),
@@ -327,8 +376,10 @@ class TemplateSelectScreen extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
+                Image.asset(placeholderImg,
+                    fit: BoxFit.cover, width: size, height: size),
+                const Icon(Icons.location_on,
+                    color: Colors.redAccent, size: 20),
               ],
             ),
           ),
@@ -344,14 +395,17 @@ class TemplateSelectScreen extends StatelessWidget {
                 width: size,
                 height: size,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFF10B981), width: 1.5),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                    const Icon(Icons.location_on, color: Colors.white, size: 20),
+                    Image.asset(placeholderImg,
+                        fit: BoxFit.cover, width: size, height: size),
+                    const Icon(Icons.location_on,
+                        color: Colors.white, size: 20),
                   ],
                 ),
               ),
@@ -383,8 +437,10 @@ class TemplateSelectScreen extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                const Icon(Icons.location_on, color: Colors.redAccent, size: 22),
+                Image.asset(placeholderImg,
+                    fit: BoxFit.cover, width: size, height: size),
+                const Icon(Icons.location_on,
+                    color: Colors.redAccent, size: 22),
               ],
             ),
           ),
@@ -403,8 +459,10 @@ class TemplateSelectScreen extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Image.asset(placeholderImg, fit: BoxFit.cover, width: size, height: size),
-                  const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
+                  Image.asset(placeholderImg,
+                      fit: BoxFit.cover, width: size, height: size),
+                  const Icon(Icons.location_on,
+                      color: Colors.redAccent, size: 20),
                 ],
               ),
             ),
@@ -432,4 +490,39 @@ class _HexagonClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+}
+
+class _PreviewWavePainter extends CustomPainter {
+  final List<Color> waveColors;
+
+  _PreviewWavePainter({required this.waveColors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (waveColors.isEmpty) return;
+
+    final w = size.width;
+    final h = size.height;
+
+    final path1 = Path();
+    path1.moveTo(0, h * 0.7);
+    path1.quadraticBezierTo(w * 0.4, h * 0.2, w, h * 0.5);
+    path1.lineTo(w, h);
+    path1.lineTo(0, h);
+    path1.close();
+    canvas.drawPath(path1, Paint()..color = waveColors[0]);
+
+    if (waveColors.length > 1) {
+      final path2 = Path();
+      path2.moveTo(w * 0.2, h);
+      path2.quadraticBezierTo(w * 0.6, h * 0.45, w, h * 0.75);
+      path2.lineTo(w, h);
+      path2.close();
+      canvas.drawPath(path2, Paint()..color = waveColors[1]);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PreviewWavePainter oldDelegate) =>
+      oldDelegate.waveColors != waveColors;
 }

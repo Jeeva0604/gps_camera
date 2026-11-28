@@ -892,15 +892,17 @@ class _CameraScreenState extends State<CameraScreen>
                             children: [
                               // Flash Toggle (Only 2 states: On or Off)
                               _buildTopGlassButton(
-                                tooltip:
-                                    _isFlashOn ? 'Turn Flash Off' : 'Turn Flash On',
+                                tooltip: _isFlashOn
+                                    ? 'Turn Flash Off'
+                                    : 'Turn Flash On',
                                 onTap: _toggleFlash,
                                 child: HugeIcon(
                                   icon: _isFlashOn
                                       ? HugeIcons.strokeRoundedFlash
                                       : HugeIcons.strokeRoundedFlashOff,
-                                  color:
-                                      _isFlashOn ? AppDesign.amber : Colors.white70,
+                                  color: _isFlashOn
+                                      ? AppDesign.amber
+                                      : Colors.white70,
                                   size: 19,
                                 ),
                               ),
