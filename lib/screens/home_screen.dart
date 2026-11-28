@@ -93,17 +93,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
-                          gradient: AppDesign.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           boxShadow: AppDesign.glowShadow(AppDesign.primary,
                               opacity: 0.35),
                         ),
-                        child: const HugeIcon(
-                          icon: HugeIcons.strokeRoundedLocation01,
-                          color: Colors.white,
-                          size: 18,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/icon/app_icon.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/icon/splash_logo.png',
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
