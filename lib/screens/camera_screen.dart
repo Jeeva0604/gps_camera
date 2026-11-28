@@ -11,8 +11,8 @@ import '../services/open_location_code.dart';
 import '../services/storage_service.dart';
 import '../services/watermark_service.dart';
 import '../widgets/gps_minimap_card.dart';
-import '../services/theme_service.dart';
 import '../services/update_service.dart';
+import '../utils/app_design.dart';
 import 'dart:io';
 import '../utils/toast_helper.dart';
 import 'preview_screen.dart';
@@ -40,7 +40,7 @@ class _CameraScreenState extends State<CameraScreen>
   List<CameraDescription> _cameras = [];
   CameraController? _cameraController;
   int _selectedCameraIndex = 0;
-  FlashMode _flashMode = FlashMode.off;
+  bool _isFlashOn = false;
 
   bool _isCameraInitialized = false;
   bool _isCapturing = false;
@@ -142,7 +142,22 @@ class _CameraScreenState extends State<CameraScreen>
       );
 
       await controller.initialize();
-      await controller.setFlashMode(_flashMode);
+      if (_isFlashOn) {
+        try {
+          final targetMode = _currentMode == CameraMode.video
+              ? FlashMode.torch
+              : FlashMode.always;
+          await controller.setFlashMode(targetMode);
+        } catch (_) {
+          try {
+            await controller.setFlashMode(FlashMode.torch);
+          } catch (_) {}
+        }
+      } else {
+        try {
+          await controller.setFlashMode(FlashMode.off);
+        } catch (_) {}
+      }
 
       if (mounted) {
         setState(() {
@@ -306,9 +321,15 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  bool _isLocationDialogOpen = false;
+
   void _showEnableLocationDialog() {
+    if (_isLocationDialogOpen) return;
+    _isLocationDialogOpen = true;
+
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -331,12 +352,14 @@ class _CameraScreenState extends State<CameraScreen>
           ],
         ),
         content: const Text(
-          'Location service is turned off. Please enable GPS so your photos can be stamped with live satellite maps, accurate coordinates, and address.',
+          'Location service is turned off. Please turn on GPS location on your device to stamp photos & videos with satellite maps, coordinates, and address.',
           style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
             child:
                 const Text('Cancel', style: TextStyle(color: Colors.white54)),
           ),
@@ -350,7 +373,7 @@ class _CameraScreenState extends State<CameraScreen>
               size: 18,
               color: Colors.black,
             ),
-            label: const Text('Enable Location'),
+            label: const Text('Turn On Location'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amberAccent,
               foregroundColor: Colors.black,
@@ -360,7 +383,9 @@ class _CameraScreenState extends State<CameraScreen>
           ),
         ],
       ),
-    );
+    ).then((_) {
+      _isLocationDialogOpen = false;
+    });
   }
 
   Future<void> _resolveAddressDebounced(double lat, double lon) async {
@@ -411,46 +436,71 @@ class _CameraScreenState extends State<CameraScreen>
     await _initializeCamera();
   }
 
+  Future<void> _suspendFlashHardware() async {
+    if (_isFlashOn &&
+        _cameraController != null &&
+        _cameraController!.value.isInitialized) {
+      try {
+        await _cameraController!.setFlashMode(FlashMode.off);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _restoreFlashHardware() async {
+    if (_isFlashOn &&
+        _cameraController != null &&
+        _cameraController!.value.isInitialized) {
+      try {
+        final targetMode = _currentMode == CameraMode.video
+            ? FlashMode.torch
+            : FlashMode.always;
+        await _cameraController!.setFlashMode(targetMode);
+      } catch (_) {
+        try {
+          await _cameraController!.setFlashMode(FlashMode.torch);
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> _toggleFlash() async {
-    if (_cameraController == null) return;
-    FlashMode nextMode;
-    String toastText;
-    switch (_flashMode) {
-      case FlashMode.off:
-        nextMode = FlashMode.auto;
-        toastText = 'Flash: Auto';
-        break;
-      case FlashMode.auto:
-        nextMode = FlashMode.always;
-        toastText = 'Flash: On';
-        break;
-      case FlashMode.always:
-      default:
-        nextMode = FlashMode.off;
-        toastText = 'Flash: Off';
-        break;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    final nextFlashState = !_isFlashOn;
+    // For video mode, constant flashlight requires FlashMode.torch; for photo, FlashMode.always or FlashMode.torch
+    FlashMode targetMode;
+    if (nextFlashState) {
+      targetMode =
+          _currentMode == CameraMode.video ? FlashMode.torch : FlashMode.always;
+    } else {
+      targetMode = FlashMode.off;
     }
 
     try {
-      await _cameraController!.setFlashMode(nextMode);
+      await _cameraController!.setFlashMode(targetMode);
       if (mounted) {
         setState(() {
-          _flashMode = nextMode;
+          _isFlashOn = nextFlashState;
         });
-        ToastHelper.show(toastText);
+        ToastHelper.show(nextFlashState ? 'Flash: On' : 'Flash: Off');
       }
     } catch (_) {
-      // If auto or always is not supported by device/lens, toggle to next supported mode
-      try {
-        final fallbackMode = _flashMode == FlashMode.off ? FlashMode.always : FlashMode.off;
-        await _cameraController!.setFlashMode(fallbackMode);
-        if (mounted) {
-          setState(() {
-            _flashMode = fallbackMode;
-          });
-          ToastHelper.show(fallbackMode == FlashMode.off ? 'Flash: Off' : 'Flash: On');
-        }
-      } catch (_) {}
+      // If FlashMode.always fails (e.g. in some Android video recording lenses), try FlashMode.torch
+      if (nextFlashState) {
+        try {
+          await _cameraController!.setFlashMode(FlashMode.torch);
+          if (mounted) {
+            setState(() {
+              _isFlashOn = true;
+            });
+            ToastHelper.show('Flash: On');
+          }
+          return;
+        } catch (_) {}
+      }
+      ToastHelper.show('Flash not available on this lens');
     }
   }
 
@@ -519,6 +569,10 @@ class _CameraScreenState extends State<CameraScreen>
         _isCapturing = false;
       });
 
+      // Turn off physical flash/torch while on Preview page
+      await _suspendFlashHardware();
+
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PreviewScreen(
@@ -527,6 +581,11 @@ class _CameraScreenState extends State<CameraScreen>
           ),
         ),
       );
+
+      // Restore flash/torch if it was enabled when returning to camera
+      if (mounted) {
+        await _restoreFlashHardware();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -656,14 +715,22 @@ class _CameraScreenState extends State<CameraScreen>
         _recordSeconds = 0;
       });
 
+      // Turn off physical flash/torch while on Video Preview page
+      await _suspendFlashHardware();
+
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VideoPreviewScreen(
             videoFile: videoFile,
-            gpsData: gpsData,
           ),
         ),
       );
+
+      // Restore flash/torch if it was enabled when returning to camera
+      if (mounted) {
+        await _restoreFlashHardware();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -681,7 +748,7 @@ class _CameraScreenState extends State<CameraScreen>
     return '$minutes:$seconds';
   }
 
-  void _switchMode(CameraMode mode) {
+  Future<void> _switchMode(CameraMode mode) async {
     if (_isRecordingVideo) {
       ToastHelper.show('Please stop recording before switching modes.');
       return;
@@ -691,6 +758,21 @@ class _CameraScreenState extends State<CameraScreen>
         _currentMode = mode;
       });
       widget.onModeChanged?.call(mode);
+
+      // If flash is currently on, update flash mode for the new camera mode (torch for video, always for photo)
+      if (_isFlashOn &&
+          _cameraController != null &&
+          _cameraController!.value.isInitialized) {
+        try {
+          final modeToSet =
+              mode == CameraMode.video ? FlashMode.torch : FlashMode.always;
+          await _cameraController!.setFlashMode(modeToSet);
+        } catch (_) {
+          try {
+            await _cameraController!.setFlashMode(FlashMode.torch);
+          } catch (_) {}
+        }
+      }
     }
   }
 
@@ -720,166 +802,121 @@ class _CameraScreenState extends State<CameraScreen>
             child: CameraPreview(controller),
           ),
 
-          // 2. Top Bar: Controls & Real-time GPS HUD
+          // 2. Modern Glassmorphic Top Bar & Controls
           SafeArea(
             child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      horizontal: 14.0, vertical: 8.0),
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      // Back to Home Button
-                      if (Navigator.of(context).canPop())
-                        IconButton(
-                          tooltip: 'Back to Home',
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const HugeIcon(
-                            icon: HugeIcons.strokeRoundedArrowLeft01,
-                            color: Colors.white,
-                            size: 20,
+                      // Center Title Capsule
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: AppDesign.radiusFull,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            width: 1,
                           ),
-                          style: IconButton.styleFrom(
-                            backgroundColor: isDark
-                                ? Colors.black.withValues(alpha: 0.5)
-                                : Colors.white.withValues(alpha: 0.85),
-                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                            ),
+                          ],
                         ),
-
-                      // Flash Toggle
-                      IconButton(
-                        onPressed: _toggleFlash,
-                        icon: Stack(
-                          alignment: Alignment.center,
-                          clipBehavior: Clip.none,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            HugeIcon(
-                              icon: _flashMode == FlashMode.off
-                                  ? HugeIcons.strokeRoundedFlashOff
-                                  : HugeIcons.strokeRoundedFlash,
-                              color: _flashMode == FlashMode.off
-                                  ? (isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF0F172A))
-                                  : (_flashMode == FlashMode.always
-                                      ? Colors.amberAccent
-                                      : Colors.amber),
-                              size: 20,
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _currentPosition != null
+                                    ? AppDesign.emerald
+                                    : AppDesign.amber,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_currentPosition != null
+                                            ? AppDesign.emerald
+                                            : AppDesign.amber)
+                                        .withValues(alpha: 0.7),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
                             ),
-                            if (_flashMode == FlashMode.auto)
-                              Positioned(
-                                right: -7,
-                                bottom: -4,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 2.5, vertical: 0.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amberAccent,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'A',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _currentMode == CameraMode.photo
+                                  ? 'GPS PHOTO'
+                                  : 'GPS VIDEO',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11.5,
+                                letterSpacing: 1.2,
                               ),
-                            if (_flashMode == FlashMode.always)
-                              Positioned(
-                                right: -8,
-                                bottom: -4,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 2.5, vertical: 0.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amberAccent,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'ON',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        style: IconButton.styleFrom(
-                          backgroundColor: isDark
-                              ? Colors.black.withValues(alpha: 0.5)
-                              : Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                      Text(
-                        'GPS CAMERA',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.7),
-                              blurRadius: 4,
                             ),
                           ],
                         ),
                       ),
-                      // Right Controls: Theme Toggle & Camera Switcher
+
+                      // Leading & Trailing Action Buttons
                       Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Theme Mode Switch Option
-                          IconButton(
-                            tooltip:
-                                isDark ? 'Switch to Light' : 'Switch to Dark',
-                            onPressed: () {
-                              ThemeService.instance.toggleTheme();
-                              ToastHelper.show(
-                                ThemeService.instance.isDarkMode
-                                    ? 'Dark mode enabled'
-                                    : 'Light mode enabled',
-                              );
-                            },
-                            icon: HugeIcon(
-                              icon: isDark
-                                  ? HugeIcons.strokeRoundedSun01
-                                  : HugeIcons.strokeRoundedMoon01,
-                              color: isDark
-                                  ? const Color(0xFFFBBF24)
-                                  : const Color(0xFF0284C7),
-                              size: 20,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? Colors.black.withValues(alpha: 0.5)
-                                  : Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Camera Switcher
-                          IconButton(
-                            onPressed: _toggleCameraLens,
-                            icon: HugeIcon(
-                              icon: HugeIcons.strokeRoundedCameraRotated01,
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF0F172A),
-                              size: 20,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? Colors.black.withValues(alpha: 0.5)
-                                  : Colors.white.withValues(alpha: 0.85),
-                            ),
+                          // Back to Home Button
+                          if (Navigator.of(context).canPop())
+                            _buildTopGlassButton(
+                              tooltip: 'Back to Home',
+                              onTap: () => Navigator.of(context).pop(),
+                              child: const HugeIcon(
+                                icon: HugeIcons.strokeRoundedArrowLeft01,
+                                color: Colors.white,
+                                size: 19,
+                              ),
+                            )
+                          else
+                            const SizedBox(width: 42),
+
+                          // Right Controls: Flash, Camera Lens Switcher
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Flash Toggle (Only 2 states: On or Off)
+                              _buildTopGlassButton(
+                                tooltip:
+                                    _isFlashOn ? 'Turn Flash Off' : 'Turn Flash On',
+                                onTap: _toggleFlash,
+                                child: HugeIcon(
+                                  icon: _isFlashOn
+                                      ? HugeIcons.strokeRoundedFlash
+                                      : HugeIcons.strokeRoundedFlashOff,
+                                  color:
+                                      _isFlashOn ? AppDesign.amber : Colors.white70,
+                                  size: 19,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Camera Switcher
+                              _buildTopGlassButton(
+                                tooltip: 'Flip Lens',
+                                onTap: _toggleCameraLens,
+                                child: const HugeIcon(
+                                  icon: HugeIcons.strokeRoundedCameraRotated01,
+                                  color: Colors.white,
+                                  size: 19,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -893,15 +930,10 @@ class _CameraScreenState extends State<CameraScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.redAccent.withValues(alpha: 0.4),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      gradient: AppDesign.videoGradient,
+                      borderRadius: AppDesign.radiusFull,
+                      boxShadow:
+                          AppDesign.glowShadow(AppDesign.coral, opacity: 0.5),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -922,6 +954,7 @@ class _CameraScreenState extends State<CameraScreen>
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                             fontFamily: 'monospace',
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
@@ -931,9 +964,9 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // 3. Floating Live GPS & Minimap Card (viewfinder overlay above shutter)
+          // 3. Floating Live GPS & Minimap Card (viewfinder overlay above shutter & mode tabs)
           Positioned(
-            bottom: 124,
+            bottom: _isRecordingVideo ? 130 : 180,
             left: 0,
             right: 0,
             child: GpsMinimapCard(
@@ -946,7 +979,7 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // 4. Bottom Shutter Bar ("take photo place")
+          // 4. Redesigned Shutter Bar & Mode Toggle
           Positioned(
             bottom: 0,
             left: 0,
@@ -958,7 +991,8 @@ class _CameraScreenState extends State<CameraScreen>
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.85),
+                    Colors.black.withValues(alpha: 0.90),
+                    Colors.black.withValues(alpha: 0.40),
                     Colors.transparent,
                   ],
                 ),
@@ -974,17 +1008,12 @@ class _CameraScreenState extends State<CameraScreen>
                         onTap: _promptEnableLocation,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                              horizontal: 18, vertical: 9),
                           decoration: BoxDecoration(
-                            color: Colors.amberAccent,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                            gradient: AppDesign.amberGradient,
+                            borderRadius: AppDesign.radiusFull,
+                            boxShadow: AppDesign.glowShadow(AppDesign.amber,
+                                opacity: 0.5),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
@@ -996,12 +1025,12 @@ class _CameraScreenState extends State<CameraScreen>
                               ),
                               SizedBox(width: 8),
                               Text(
-                                'Location is Off • Tap to Enable',
+                                'Location Required • Tap to Enable',
                                 style: TextStyle(
                                   color: Colors.black,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w800,
                                   fontSize: 12.5,
-                                  letterSpacing: 0.2,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ],
@@ -1010,17 +1039,18 @@ class _CameraScreenState extends State<CameraScreen>
                       ),
                     ),
 
-                  // Mode Selector Tabs (Photo vs Video)
+                  // Redesigned Glass Mode Selector Tabs (Photo vs Video)
                   if (!_isRecordingVideo)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.only(bottom: 14),
                       child: Container(
-                        padding: const EdgeInsets.all(3),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(24),
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: AppDesign.radiusFull,
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.15),
+                            width: 1,
                           ),
                         ),
                         child: Row(
@@ -1032,33 +1062,33 @@ class _CameraScreenState extends State<CameraScreen>
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 7),
+                                    horizontal: 18, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: _currentMode == CameraMode.photo
-                                      ? Colors.white
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: _currentMode == CameraMode.photo
+                                      ? AppDesign.primaryGradient
+                                      : null,
+                                  borderRadius: AppDesign.radiusFull,
+                                  boxShadow: _currentMode == CameraMode.photo
+                                      ? AppDesign.glowShadow(AppDesign.primary,
+                                          opacity: 0.4)
+                                      : null,
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     HugeIcon(
                                       icon: HugeIcons.strokeRoundedCamera01,
                                       size: 15,
-                                      color: _currentMode == CameraMode.photo
-                                          ? Colors.black
-                                          : Colors.white70,
+                                      color: Colors.white,
                                     ),
-                                    const SizedBox(width: 6),
+                                    SizedBox(width: 6),
                                     Text(
                                       'PHOTO',
                                       style: TextStyle(
-                                        color: _currentMode == CameraMode.photo
-                                            ? Colors.black
-                                            : Colors.white70,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        letterSpacing: 0.8,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11.5,
+                                        letterSpacing: 1.0,
                                       ),
                                     ),
                                   ],
@@ -1071,33 +1101,33 @@ class _CameraScreenState extends State<CameraScreen>
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 7),
+                                    horizontal: 18, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: _currentMode == CameraMode.video
-                                      ? Colors.redAccent
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: _currentMode == CameraMode.video
+                                      ? AppDesign.videoGradient
+                                      : null,
+                                  borderRadius: AppDesign.radiusFull,
+                                  boxShadow: _currentMode == CameraMode.video
+                                      ? AppDesign.glowShadow(AppDesign.coral,
+                                          opacity: 0.5)
+                                      : null,
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     HugeIcon(
                                       icon: HugeIcons.strokeRoundedVideo01,
-                                      size: 16,
-                                      color: _currentMode == CameraMode.video
-                                          ? Colors.white
-                                          : Colors.white70,
+                                      size: 15,
+                                      color: Colors.white,
                                     ),
-                                    const SizedBox(width: 6),
+                                    SizedBox(width: 6),
                                     Text(
                                       'VIDEO',
                                       style: TextStyle(
-                                        color: _currentMode == CameraMode.video
-                                            ? Colors.white
-                                            : Colors.white70,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        letterSpacing: 0.8,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11.5,
+                                        letterSpacing: 1.0,
                                       ),
                                     ),
                                   ],
@@ -1109,7 +1139,7 @@ class _CameraScreenState extends State<CameraScreen>
                       ),
                     ),
 
-                  // Shutter Button (Adaptive for Photo vs Video)
+                  // Modern Shutter Control Button
                   GestureDetector(
                     onTap: _isCapturing
                         ? null
@@ -1119,33 +1149,39 @@ class _CameraScreenState extends State<CameraScreen>
                                 ? _stopVideoRecording
                                 : _startVideoRecording)),
                     child: Container(
-                      width: 78,
-                      height: 78,
+                      width: 82,
+                      height: 82,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: _currentMode == CameraMode.video
-                              ? Colors.redAccent
+                              ? AppDesign.coral
                               : Colors.white,
-                          width: 4,
+                          width: 3.5,
                         ),
-                        color: (_currentMode == CameraMode.video
-                                ? Colors.redAccent
-                                : Colors.white)
-                            .withValues(alpha: 0.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_currentMode == CameraMode.video
+                                    ? AppDesign.coral
+                                    : Colors.white)
+                                .withValues(alpha: 0.25),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                       padding: const EdgeInsets.all(5),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         decoration: BoxDecoration(
-                          color: _currentMode == CameraMode.video
-                              ? Colors.redAccent
-                              : Colors.white,
-                          shape: _isRecordingVideo
-                              ? BoxShape.rectangle
-                              : BoxShape.circle,
-                          borderRadius: _isRecordingVideo
-                              ? BorderRadius.circular(8)
-                              : null,
+                          gradient: _currentMode == CameraMode.video
+                              ? AppDesign.videoGradient
+                              : const LinearGradient(
+                                  colors: [Colors.white, Color(0xFFE2E8F0)],
+                                ),
+                          borderRadius: BorderRadius.circular(
+                            _isRecordingVideo ? 12 : 36,
+                          ),
                         ),
                         child: Center(
                           child: HugeIcon(
@@ -1156,8 +1192,8 @@ class _CameraScreenState extends State<CameraScreen>
                                 : HugeIcons.strokeRoundedCamera01,
                             color: _currentMode == CameraMode.video
                                 ? Colors.white
-                                : Colors.black,
-                            size: 28,
+                                : AppDesign.darkCanvas,
+                            size: 30,
                           ),
                         ),
                       ),
@@ -1175,24 +1211,29 @@ class _CameraScreenState extends State<CameraScreen>
               child: Center(
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(16),
+                    color: AppDesign.darkCard,
+                    borderRadius: AppDesign.radiusMedium,
                     border: Border.all(
-                        color: Colors.blueAccent.withValues(alpha: 0.4)),
+                      color: AppDesign.primary.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                    boxShadow:
+                        AppDesign.glowShadow(AppDesign.primary, opacity: 0.3),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(color: Colors.cyanAccent),
+                      const CircularProgressIndicator(color: AppDesign.accent),
                       const SizedBox(height: 16),
                       Text(
                         _processingMessage,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ],
@@ -1201,6 +1242,33 @@ class _CameraScreenState extends State<CameraScreen>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopGlassButton({
+    required Widget child,
+    required VoidCallback onTap,
+    String? tooltip,
+  }) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.18),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Center(child: child),
+        ),
       ),
     );
   }

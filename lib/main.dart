@@ -40,7 +40,9 @@ class GpsCameraApp extends StatelessWidget {
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF8FAFC),
             appBarTheme: const AppBarTheme(
+              surfaceTintColor: Colors.transparent,
               backgroundColor: Colors.white,
+              titleSpacing: 0,
               foregroundColor: Color(0xFF0F172A),
               elevation: 0,
             ),
@@ -56,6 +58,8 @@ class GpsCameraApp extends StatelessWidget {
             brightness: Brightness.dark,
             scaffoldBackgroundColor: const Color(0xFF0F172A),
             appBarTheme: const AppBarTheme(
+              surfaceTintColor: Colors.transparent,
+              titleSpacing: 0,
               backgroundColor: Color(0xFF0F172A),
               foregroundColor: Colors.white,
               elevation: 0,
@@ -67,8 +71,7 @@ class GpsCameraApp extends StatelessWidget {
             ),
             useMaterial3: true,
           ),
-          home:
-              hasPermissions ? const HomeScreen() : const PermissionScreen(),
+          home: hasPermissions ? const HomeScreen() : const PermissionScreen(),
         );
       },
     );

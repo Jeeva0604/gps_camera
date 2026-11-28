@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/review_service.dart';
 import '../services/theme_service.dart';
 import '../services/update_service.dart';
+import '../utils/app_design.dart';
 import '../utils/toast_helper.dart';
 import 'in_app_web_view_screen.dart';
 
@@ -18,7 +19,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // App info constants & dynamic version state
   String _appVersion = '1.0.0';
   String _buildNumber = '2';
   static const String _supportEmail = 'hellojeralabs@gmail.com';
@@ -107,14 +107,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? AppDesign.darkCard : AppDesign.lightCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: Text(
           'Choose Theme',
           style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+            color:
+                isDark ? AppDesign.darkTextPrimary : AppDesign.lightTextPrimary,
+            fontWeight: FontWeight.w800,
             fontSize: 18,
           ),
         ),
@@ -177,13 +177,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       tileColor: selected
-          ? Colors.blueAccent.withValues(alpha: 0.15)
+          ? AppDesign.primary.withValues(alpha: 0.15)
           : Colors.transparent,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.blueAccent.withValues(alpha: 0.2)
+              ? AppDesign.primary.withValues(alpha: 0.2)
               : (isDark
                   ? Colors.white.withValues(alpha: 0.05)
                   : const Color(0xFFE2E8F0)),
@@ -193,14 +193,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: icon,
           size: 20,
           color: selected
-              ? Colors.blueAccent
-              : (isDark ? Colors.white70 : const Color(0xFF475569)),
+              ? AppDesign.primaryGlow
+              : (isDark
+                  ? AppDesign.darkTextSecondary
+                  : AppDesign.lightTextSecondary),
         ),
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isDark ? Colors.white : const Color(0xFF0F172A),
+          color:
+              isDark ? AppDesign.darkTextPrimary : AppDesign.lightTextPrimary,
           fontWeight: selected ? FontWeight.bold : FontWeight.w500,
           fontSize: 15,
         ),
@@ -208,14 +211,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          color: isDark ? AppDesign.darkTextMuted : AppDesign.lightTextMuted,
           fontSize: 12,
         ),
       ),
       trailing: selected
           ? const HugeIcon(
               icon: HugeIcons.strokeRoundedCheckmarkCircle02,
-              color: Colors.blueAccent,
+              color: AppDesign.primaryGlow,
               size: 22,
             )
           : null,
@@ -240,20 +243,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, _) {
         final isDark = ThemeService.instance.isDarkMode;
         final backgroundColor =
-            isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-        final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+            isDark ? AppDesign.darkCanvas : AppDesign.lightCanvas;
+        final cardColor = isDark ? AppDesign.darkCard : AppDesign.lightCard;
         final primaryTextColor =
-            isDark ? Colors.white : const Color(0xFF0F172A);
+            isDark ? AppDesign.darkTextPrimary : AppDesign.lightTextPrimary;
         final secondaryTextColor =
-            isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        final borderColor = isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : const Color(0xFFE2E8F0);
+            isDark ? AppDesign.darkTextSecondary : AppDesign.lightTextSecondary;
+        final borderColor =
+            isDark ? AppDesign.darkBorder : AppDesign.lightBorder;
 
         return Scaffold(
           backgroundColor: backgroundColor,
           appBar: AppBar(
-            backgroundColor: cardColor,
+            backgroundColor:
+                isDark ? AppDesign.darkSurface : AppDesign.lightSurface,
             elevation: 0,
             leading: IconButton(
               icon: HugeIcon(
@@ -267,8 +270,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'Settings',
               style: TextStyle(
                 color: primaryTextColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -282,18 +286,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(20),
+                    gradient: AppDesign.glassCardGradient(isDark),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: borderColor),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDark
-                            ? Colors.black.withValues(alpha: 0.3)
-                            : const Color(0xFF64748B).withValues(alpha: 0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    boxShadow: AppDesign.softShadow(isDark),
                   ),
                   child: Row(
                     children: [
@@ -302,13 +298,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         height: 58,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blueAccent.withValues(alpha: 0.25),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          boxShadow: AppDesign.glowShadow(AppDesign.primary,
+                              opacity: 0.25),
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
@@ -331,13 +322,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               'GPS Map Camera',
                               style: TextStyle(
                                 fontSize: 17,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w800,
                                 color: primaryTextColor,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Geotag photos & HD videos with GPS',
+                              'Geotag photos & Full HD videos with GPS',
                               style: TextStyle(
                                 fontSize: 12.5,
                                 color: secondaryTextColor,
@@ -475,8 +466,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         'GPS Camera v$_appVersion ($_buildNumber)',
                         style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                           color: secondaryTextColor,
                           letterSpacing: 0.3,
                         ),
@@ -517,7 +508,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -550,17 +541,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
           child: Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: isDark ? 0.18 : 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(13),
                 ),
                 child: Center(
                   child: HugeIcon(
@@ -579,7 +570,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title,
                       style: TextStyle(
                         fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: primaryTextColor,
                       ),
                     ),

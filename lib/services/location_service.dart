@@ -255,15 +255,17 @@ class LocationService {
       return false;
     }
 
-    final hasPermission = permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
-
-    // 2. If permission is granted, check hardware location service (GPS switch)
+    // 2. Open Android system location settings (GPS toggle)
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       await Geolocator.openLocationSettings();
-      return false;
+      // Brief delay to allow settings screen to open
+      await Future.delayed(const Duration(milliseconds: 500));
+      return await Geolocator.isLocationServiceEnabled();
     }
+
+    final hasPermission = permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
 
     return hasPermission && serviceEnabled;
   }

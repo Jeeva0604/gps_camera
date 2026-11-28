@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/gps_photo_data.dart';
 import '../services/review_service.dart';
 import '../services/storage_service.dart';
+import '../utils/app_design.dart';
 import '../utils/toast_helper.dart';
 import '../widgets/prominent_map_pin.dart';
 
@@ -62,11 +63,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   void _showMetadataBottomSheet() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppDesign.darkSurface : Colors.white;
+    final textPrimary =
+        isDark ? AppDesign.darkTextPrimary : AppDesign.lightTextPrimary;
+    final textSecondary =
+        isDark ? AppDesign.darkTextSecondary : AppDesign.lightTextSecondary;
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      isScrollControlled: true,
+      backgroundColor: cardBg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) {
         return SafeArea(
@@ -79,129 +87,136 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 children: [
                   Center(
                     child: Container(
-                      width: 40,
-                      height: 4,
+                      width: 44,
+                      height: 5,
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.grey.shade600
-                            : Colors.grey.shade400,
-                        borderRadius: BorderRadius.circular(2),
+                        color: isDark ? Colors.white24 : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(
-                          'assets/icon/app_icon.png',
-                          width: 28,
-                          height: 28,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 28,
-                            height: 28,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF38BDF8),
-                              borderRadius: BorderRadius.circular(6),
+                              gradient: AppDesign.primaryGradient,
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: const HugeIcon(
-                              icon: HugeIcons.strokeRoundedCamera01,
-                              size: 16,
-                              color: Color(0xFF0F172A),
+                              icon: HugeIcons.strokeRoundedLocation01,
+                              size: 18,
+                              color: Colors.white,
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'GPS Camera',
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF0F172A),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'GPS & Location Metadata',
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.white60
-                                  : const Color(0xFF64748B),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      height: 180,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                            color: isDark ? Colors.white24 : Colors.black12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: FlutterMap(
-                        options: MapOptions(
-                          initialCenter: LatLng(widget.gpsData.latitude,
-                              widget.gpsData.longitude),
-                          initialZoom: 18.0,
-                          minZoom: 4.0,
-                          maxZoom: 20.0,
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                            userAgentPackageName: 'com.jera.gps_camera',
-                            maxNativeZoom: 18,
-                            fallbackUrl:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            errorTileCallback: (tile, error, stackTrace) {
-                              debugPrint('Map tile error: $error');
-                            },
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: LatLng(widget.gpsData.latitude,
-                                    widget.gpsData.longitude),
-                                width: 38,
-                                height: 38,
-                                child: const ProminentMapPin(size: 38),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Location Snapshot',
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Embedded Photo Geodata',
+                                style: TextStyle(
+                                  color: textSecondary,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                    ),
+                      IconButton(
+                        icon: HugeIcon(
+                          icon: HugeIcons.strokeRoundedCancel01,
+                          color: textSecondary,
+                          size: 20,
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
-                  _buildMetaTile('Location',
-                      '${widget.gpsData.flagEmoji} ${widget.gpsData.titleLocation}',
-                      isDark: isDark),
-                  _buildMetaTile('Detailed Address (Plus Code)',
-                      widget.gpsData.detailedAddressWithPlusCode,
-                      isDark: isDark),
-                  _buildMetaTile('Coordinates', widget.gpsData.formattedLatLong,
-                      isDark: isDark),
-                  _buildMetaTile(
-                      'Timestamp', widget.gpsData.formattedDateTimeWithGmt,
-                      isDark: isDark),
-                  _buildMetaTile('Altitude / Accuracy',
-                      '${widget.gpsData.altitude.toStringAsFixed(1)}m (±${widget.gpsData.accuracy.toStringAsFixed(1)}m)',
-                      isDark: isDark),
+
+                  // Mini Map snapshot inside sheet
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: SizedBox(
+                      height: 180,
+                      child: Stack(
+                        children: [
+                          FlutterMap(
+                            options: MapOptions(
+                              initialCenter: LatLng(
+                                widget.gpsData.latitude,
+                                widget.gpsData.longitude,
+                              ),
+                              initialZoom: 17.5,
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.none,
+                              ),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                                userAgentPackageName: 'com.jera.gps_camera',
+                                maxNativeZoom: 18,
+                                fallbackUrl:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              ),
+                            ],
+                          ),
+                          const Center(
+                            child: ProminentMapPin(size: 28),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  _buildMetadataTile(
+                    label: 'Coordinates',
+                    value: widget.gpsData.formattedCoordinates,
+                    icon: HugeIcons.strokeRoundedLocation01,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildMetadataTile(
+                    label: 'Address',
+                    value: widget.gpsData.fullAddress,
+                    icon: HugeIcons.strokeRoundedFlag01,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildMetadataTile(
+                    label: 'Captured Timestamp',
+                    value: widget.gpsData.formattedDateTimeWithGmt,
+                    icon: HugeIcons.strokeRoundedTime02,
+                    isDark: isDark,
+                  ),
+                  if (widget.gpsData.altitude != 0.0) ...[
+                    const SizedBox(height: 8),
+                    _buildMetadataTile(
+                      label: 'Altitude',
+                      value:
+                          '${widget.gpsData.altitude.toStringAsFixed(1)} m Above Sea Level',
+                      icon: HugeIcons.strokeRoundedSatellite01,
+                      isDark: isDark,
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -211,25 +226,57 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildMetaTile(String label, String value, {bool isDark = true}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Column(
+  Widget _buildMetadataTile({
+    required String label,
+    required String value,
+    required dynamic icon,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: isDark ? AppDesign.darkCard : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppDesign.darkBorder : AppDesign.lightBorder,
+        ),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-                color: isDark ? Colors.grey.shade400 : const Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.bold),
+          HugeIcon(
+            icon: icon,
+            size: 18,
+            color: AppDesign.accent,
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                fontSize: 14),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppDesign.darkTextMuted
+                        : AppDesign.lightTextMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppDesign.darkTextPrimary
+                        : AppDesign.lightTextPrimary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -241,54 +288,76 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? AppDesign.darkCanvas : AppDesign.lightCanvas,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0B0F19) : Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: HugeIcon(
-            icon: HugeIcons.strokeRoundedArrowLeft01,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-            size: 20,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 14.0),
+          child: Center(
+            child: _buildTopGlassButton(
+              icon: HugeIcons.strokeRoundedArrowLeft01,
+              onTap: () => Navigator.of(context).pop(),
+              isDark: isDark,
+            ),
           ),
-          onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          'Stamped Photo Preview',
-          style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.05),
+            borderRadius: AppDesign.radiusFull,
+            border: Border.all(
+              color: isDark ? AppDesign.darkBorder : AppDesign.lightBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: AppDesign.emerald,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'STAMPED PHOTO',
+                style: TextStyle(
+                  color: isDark
+                      ? AppDesign.darkTextPrimary
+                      : AppDesign.lightTextPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ],
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            tooltip: 'View Metadata',
-            icon: Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : const Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              child: HugeIcon(
+          Padding(
+            padding: const EdgeInsets.only(right: 14.0),
+            child: Center(
+              child: _buildTopGlassButton(
                 icon: HugeIcons.strokeRoundedInformationCircle,
-                color: isDark ? Colors.cyanAccent : const Color(0xFF0284C7),
-                size: 20,
+                onTap: _showMetadataBottomSheet,
+                isDark: isDark,
+                highlightColor: AppDesign.accent,
               ),
             ),
-            onPressed: _showMetadataBottomSheet,
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // Zoomable / Pannable Stamped Image
+          // Zoomable / Pannable Stamped Image with Modern Card Frame
           Expanded(
             child: InteractiveViewer(
               panEnabled: true,
@@ -297,12 +366,25 @@ class _PreviewScreenState extends State<PreviewScreen> {
               child: Center(
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.file(
-                      widget.photoFile,
-                      fit: BoxFit.contain,
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: isDark ? 0.6 : 0.15),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Image.file(
+                        widget.photoFile,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
@@ -310,11 +392,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
           ),
 
-          // Modern Floating Action Dock
+          // Redesigned Glassmorphic Floating Action Dock
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+              padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
               child: _buildModernBottomBar(context, isDark),
             ),
           ),
@@ -323,28 +405,63 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
+  Widget _buildTopGlassButton({
+    required dynamic icon,
+    required VoidCallback onTap,
+    required bool isDark,
+    Color? highlightColor,
+  }) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: isDark ? AppDesign.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(
+          color: isDark ? AppDesign.darkBorder : AppDesign.lightBorder,
+        ),
+        boxShadow: AppDesign.softShadow(isDark),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(11),
+          onTap: onTap,
+          child: Center(
+            child: HugeIcon(
+              icon: icon,
+              size: 17,
+              color: highlightColor ??
+                  (isDark
+                      ? AppDesign.darkTextPrimary
+                      : AppDesign.lightTextPrimary),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildModernBottomBar(BuildContext context, bool isDark) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(30),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF1E293B).withValues(alpha: 0.88)
+                ? AppDesign.darkCard.withValues(alpha: 0.88)
                 : Colors.white.withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.black.withValues(alpha: 0.08),
+              color: isDark ? AppDesign.darkBorder : AppDesign.lightBorder,
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
-                blurRadius: 20,
+                blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
             ],
@@ -352,33 +469,32 @@ class _PreviewScreenState extends State<PreviewScreen> {
           child: Row(
             children: [
               // Retake Button
-              _buildDockIconButton(
+              _buildDockButton(
                 icon: HugeIcons.strokeRoundedRefresh,
                 label: 'Retake',
                 onTap: () => Navigator.of(context).pop(),
                 isDark: isDark,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
 
               // Map & Info Button
-              _buildDockIconButton(
+              _buildDockButton(
                 icon: HugeIcons.strokeRoundedLocation01,
-                label: 'Map Info',
+                label: 'Geodata',
                 onTap: _showMetadataBottomSheet,
                 isDark: isDark,
-                highlightColor:
-                    isDark ? Colors.cyanAccent : const Color(0xFF0284C7),
+                accentColor: AppDesign.accent,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
 
               // Share Button
-              _buildDockIconButton(
+              _buildDockButton(
                 icon: HugeIcons.strokeRoundedShare01,
                 label: 'Share',
                 onTap: _sharePhoto,
                 isDark: isDark,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
 
               // Hero Save Button
               Expanded(
@@ -391,59 +507,60 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildDockIconButton({
+  Widget _buildDockButton({
     required dynamic icon,
     required String label,
     required VoidCallback onTap,
     required bool isDark,
-    Color? highlightColor,
+    Color? accentColor,
   }) {
-    final iconColor =
-        highlightColor ?? (isDark ? Colors.white : const Color(0xFF0F172A));
-    final textColor = isDark ? Colors.white70 : const Color(0xFF475569);
+    final iconColor = accentColor ??
+        (isDark ? AppDesign.darkTextPrimary : AppDesign.lightTextPrimary);
+    final textColor =
+        isDark ? AppDesign.darkTextSecondary : AppDesign.lightTextSecondary;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : const Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-                border: Border.all(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.black.withValues(alpha: 0.06),
-                  width: 1,
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : const Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color:
+                        isDark ? AppDesign.darkBorder : AppDesign.lightBorder,
+                  ),
+                ),
+                child: Center(
+                  child: HugeIcon(
+                    icon: icon,
+                    size: 20,
+                    color: iconColor,
+                  ),
                 ),
               ),
-              child: Center(
-                child: HugeIcon(
-                  icon: icon,
-                  size: 20,
-                  color: iconColor,
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: textColor,
-                letterSpacing: 0.1,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -457,30 +574,22 @@ class _PreviewScreenState extends State<PreviewScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: (isSaving || isSaved) ? null : _saveToGallery,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
-          height: 48,
+          height: 50,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isSaved
-                  ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                  : [const Color(0xFF2563EB), const Color(0xFF06B6D4)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+            gradient: isSaved
+                ? const LinearGradient(
+                    colors: [Color(0xFF059669), Color(0xFF10B981)],
+                  )
+                : AppDesign.primaryGradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppDesign.glowShadow(
+              isSaved ? AppDesign.emerald : AppDesign.primary,
+              opacity: 0.45,
             ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: (isSaved
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF2563EB))
-                    .withValues(alpha: 0.38),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Center(
             child: Row(
@@ -505,16 +614,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     size: 20,
                   ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    isSaving ? 'Saving...' : (isSaved ? 'Saved' : 'Save Photo'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 0.2,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  isSaving ? 'Saving...' : (isSaved ? 'Saved' : 'Save Photo'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ],
